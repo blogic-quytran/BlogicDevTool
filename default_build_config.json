@@ -1,0 +1,75 @@
+{
+  "OutputBasePath": "D:\\BLOGIC\\Task\\dll20260519_PS-2283_RedesignSchedulePrepPrinterSetting",
+  "CopyExtensions": [
+    ".dll",
+    ".exe",
+    ".resources.dll"
+  ],
+  "GitBaseBranch": "origin/develop",
+  "GitCompareBranch": "HEAD",
+  "Configs": [
+    {
+      "Name": "Common",
+      "SolutionPath": "D:\\BLOGIC\\Planet\\Common\\Source\\BLogicSystems.xPos.Common.sln",
+      "Configuration": "Release",
+      "BuildEngine": "msbuild",
+      "OutputFolderName": "Common",
+      "ExtraFolders": [],
+      "RedistributeTo": [
+        "Server",
+        "POS",
+        "BO"
+      ],
+      "FilterByGit": true
+    },
+    {
+      "Name": "Server",
+      "SolutionPath": "D:\\BLOGIC\\Planet\\Server\\Source\\BLogicSystems.xPos.Server.sln",
+      "Configuration": "Release",
+      "BuildEngine": "msbuild",
+      "OutputFolderName": "Server/bin",
+      "ExtraFolders": [
+        "Language",
+        "Templates"
+      ],
+      "RedistributeTo": [],
+      "FilterByGit": true
+    },
+    {
+      "Name": "POS",
+      "SolutionPath": "D:\\BLOGIC\\Planet\\PointOfSale\\Source\\BLogicSystems.xPos.PointOfSale.sln",
+      "Configuration": "Release",
+      "BuildEngine": "msbuild",
+      "OutputFolderName": "POS",
+      "ExtraFolders": [
+        "Language",
+        "Templates"
+      ],
+      "RedistributeTo": [],
+      "FilterByGit": true
+    },
+    {
+      "Name": "BO",
+      "SolutionPath": "D:\\BLOGIC\\Planet\\BackOffice\\Source\\BLogicSystems.POS.BackOffice.sln",
+      "Configuration": "Release",
+      "BuildEngine": "msbuild",
+      "OutputFolderName": "BO",
+      "ExtraFolders": [
+        "Language",
+        "Templates"
+      ],
+      "RedistributeTo": [],
+      "FilterByGit": true
+    },
+    {
+      "Name": "BLogicConnector",
+      "SolutionPath": "D:\\BLOGIC\\BLogicConnector\\BLogicConnector.sln",
+      "Configuration": "Release",
+      "BuildEngine": "msbuild",
+      "OutputFolderName": "BLogicConnector",
+      "ExtraFolders": [],
+      "RedistributeTo": [],
+      "FilterByGit": false
+    }
+  ]
+}

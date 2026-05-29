@@ -1,0 +1,28 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+publish/
+publish_single/
+build_logs/
+
+# Stray build artifacts in project root
+*.exe
+*.pdb
+
+# User-specific / IDE
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Runtime config produced by the tool
+build_config.json
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# OS
+Thumbs.db
+desktop.ini
