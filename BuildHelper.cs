@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Text;
 using System.Xml.Linq;
 using System.Text.RegularExpressions;
@@ -11,6 +12,7 @@ public static class BuildHelper
         string solutionPath, string configuration, string engine, Action<string>? logger = null)
     {
         var workingDir = Path.GetDirectoryName(solutionPath) ?? Environment.CurrentDirectory;
+        var combined = new StringBuilder();
 
         if (string.Equals(engine, "msbuild", StringComparison.OrdinalIgnoreCase))
         {
@@ -23,16 +25,43 @@ public static class BuildHelper
                 return (-1, msg);
             }
             logger?.Invoke($"[INFO] Using MSBuild: {msbuild}");
+
+            // Clean first, then build — so stale artifacts never leak into the release.
+            logger?.Invoke("[INFO] Cleaning solution...");
+            var cleanArgs = $"\"{solutionPath}\" /t:Clean " +
+                            $"/p:Configuration={configuration} " +
+                            $"/m /nologo /v:minimal";
+            var (cleanExit, cleanOut) = await RunProcessAsync(msbuild, cleanArgs, workingDir,
+                timeoutMs: 1_800_000, logger);
+            combined.AppendLine(cleanOut);
+            if (cleanExit != 0)
+                logger?.Invoke($"[WARN] Clean returned exit {cleanExit}; continuing to build.");
+
+            logger?.Invoke("[INFO] Building solution...");
             var msArgs = $"\"{solutionPath}\" /t:Build " +
                          $"/p:Configuration={configuration} " +
                          $"/m /nologo /v:minimal /clp:Summary";
-            return await RunProcessAsync(msbuild, msArgs, workingDir,
+            var (buildExit, buildOut) = await RunProcessAsync(msbuild, msArgs, workingDir,
                 timeoutMs: 1_800_000, logger);
+            combined.AppendLine(buildOut);
+            return (buildExit, combined.ToString());
         }
 
-        var dotnetArgs = $"build \"{solutionPath}\" -c {configuration} --nologo -v minimal";
-        return await RunProcessAsync("dotnet", dotnetArgs, workingDir,
+        // dotnet engine: clean first, then build.
+        logger?.Invoke("[INFO] Cleaning solution...");
+        var dotnetCleanArgs = $"clean \"{solutionPath}\" -c {configuration} --nologo -v minimal";
+        var (dcExit, dcOut) = await RunProcessAsync("dotnet", dotnetCleanArgs, workingDir,
             timeoutMs: 1_800_000, logger);
+        combined.AppendLine(dcOut);
+        if (dcExit != 0)
+            logger?.Invoke($"[WARN] Clean returned exit {dcExit}; continuing to build.");
+
+        logger?.Invoke("[INFO] Building solution...");
+        var dotnetArgs = $"build \"{solutionPath}\" -c {configuration} --nologo -v minimal";
+        var (dbExit, dbOut) = await RunProcessAsync("dotnet", dotnetArgs, workingDir,
+            timeoutMs: 1_800_000, logger);
+        combined.AppendLine(dbOut);
+        return (dbExit, combined.ToString());
     }
 
     private static string? _cachedMsBuildPath;
@@ -177,11 +206,89 @@ public static class BuildHelper
         return (copied, skipped);
     }
 
+    /// <summary>
+    /// Zips the CONTENTS of <paramref name="folderPath"/> into "&lt;folderName&gt;.zip"
+    /// placed INSIDE that same folder. The archive is built in a temp file first so
+    /// it never tries to include itself, then moved into place. The base directory is
+    /// NOT included, so extracting the zip yields the sub-folders directly (BO/, POS/…)
+    /// rather than a single wrapping "&lt;folderName&gt;/" root. Returns the final zip path.
+    /// </summary>
+    public static string ZipOutputFolder(string folderPath, Action<string>? logger = null)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath))
+            throw new ArgumentException("Folder path is empty.");
+        folderPath = Path.GetFullPath(folderPath);
+        if (!Directory.Exists(folderPath))
+            throw new DirectoryNotFoundException($"Output folder not found: {folderPath}");
+
+        var folderName = new DirectoryInfo(folderPath).Name;
+        var finalZipPath = Path.Combine(folderPath, folderName + ".zip");
+
+        // Remove a stale zip from a previous run BEFORE creating the archive,
+        // otherwise it would be swept into the new zip.
+        if (File.Exists(finalZipPath))
+        {
+            File.SetAttributes(finalZipPath, FileAttributes.Normal);
+            File.Delete(finalZipPath);
+        }
+
+        var tempZip = Path.Combine(Path.GetTempPath(),
+            $"{SanitizeFileName(folderName)}_{Guid.NewGuid():N}.zip");
+        try
+        {
+            ZipFile.CreateFromDirectory(folderPath, tempZip,
+                CompressionLevel.Optimal, includeBaseDirectory: false);
+            File.Move(tempZip, finalZipPath, overwrite: true);
+        }
+        finally
+        {
+            try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch { /* best effort */ }
+        }
+
+        logger?.Invoke($"  ✔ Zipped → {finalZipPath}");
+        return finalZipPath;
+    }
+
     private static string SanitizeFileName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
         var chars = name.Select(c => invalid.Contains(c) ? '_' : c).ToArray();
         return new string(chars);
+    }
+
+    /// <summary>
+    /// Deletes everything INSIDE <paramref name="dir"/> (files and sub-folders) but
+    /// keeps the folder itself. Read-only attributes are cleared first so locked
+    /// artifacts from a previous build can be removed. Returns the number of
+    /// top-level entries removed. No-op if the folder does not exist.
+    /// </summary>
+    public static int ClearDirectoryContents(string dir)
+    {
+        if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir)) return 0;
+        int removed = 0;
+        foreach (var entry in Directory.EnumerateFileSystemEntries(dir))
+        {
+            if (Directory.Exists(entry))
+            {
+                NormalizeAttributesRecursive(entry);
+                Directory.Delete(entry, recursive: true);
+            }
+            else
+            {
+                try { File.SetAttributes(entry, FileAttributes.Normal); } catch { /* best effort */ }
+                File.Delete(entry);
+            }
+            removed++;
+        }
+        return removed;
+    }
+
+    private static void NormalizeAttributesRecursive(string dir)
+    {
+        foreach (var f in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+        {
+            try { File.SetAttributes(f, FileAttributes.Normal); } catch { /* best effort */ }
+        }
     }
 
     public static List<string> FindAllProjectsInSolution(string solutionPath)

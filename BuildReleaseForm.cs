@@ -18,6 +18,8 @@ public partial class BuildReleaseForm : UserControl
     private List<string> _copyExtensions = new() { ".dll", ".exe", ".pdb", ".xml", ".exe.config" };
     private string _gitBaseBranch = "dev";
     private string _gitCompareBranch = "HEAD";
+    private bool _zipAfterBuild = true;
+    private bool _cleanOutputFirst = true;
     private List<BuildConfig> _configs = new();
     private int _selectedIndex = -1;
     private bool _suppressDetailEvents = false;
@@ -61,6 +63,8 @@ public partial class BuildReleaseForm : UserControl
             _gitBaseBranch = settings.GitBaseBranch;
         if (!string.IsNullOrWhiteSpace(settings.GitCompareBranch))
             _gitCompareBranch = settings.GitCompareBranch;
+        _zipAfterBuild = settings.ZipAfterBuild;
+        _cleanOutputFirst = settings.CleanOutputFirst;
         _suppressGlobalEvents = true;
         txtGlobalOutBase.Text = _outputBasePath;
         cboConfig.SelectedItem = _configuration;
@@ -68,6 +72,8 @@ public partial class BuildReleaseForm : UserControl
         UpdateExtensionsButtonText();
         txtGitBase.Text = _gitBaseBranch;
         txtGitCompare.Text = _gitCompareBranch;
+        chkZipOutput.Checked = _zipAfterBuild;
+        chkCleanFirst.Checked = _cleanOutputFirst;
         _suppressGlobalEvents = false;
         RefreshList(preserveChecks: false);
         if (_configs.Count > 0)
@@ -93,6 +99,8 @@ public partial class BuildReleaseForm : UserControl
             CopyExtensions = _copyExtensions,
             GitBaseBranch = _gitBaseBranch,
             GitCompareBranch = _gitCompareBranch,
+            ZipAfterBuild = _zipAfterBuild,
+            CleanOutputFirst = _cleanOutputFirst,
             Configs = _configs
         };
 
@@ -287,6 +295,18 @@ public partial class BuildReleaseForm : UserControl
     {
         if (_suppressGlobalEvents) return;
         _gitCompareBranch = txtGitCompare.Text.Trim();
+    }
+
+    private void chkZipOutput_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (_suppressGlobalEvents) return;
+        _zipAfterBuild = chkZipOutput.Checked;
+    }
+
+    private void chkCleanFirst_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (_suppressGlobalEvents) return;
+        _cleanOutputFirst = chkCleanFirst.Checked;
     }
 
     private void btnGlobalBrowseOutBase_Click(object? sender, EventArgs e)
@@ -677,6 +697,9 @@ public partial class BuildReleaseForm : UserControl
         {
             try { BuildConfigStore.Save(BuildSettingsSnapshot()); } catch { /* non-fatal */ }
 
+            if (_cleanOutputFirst)
+                await Task.Run(() => CleanDestinations(targets));
+
             int idx = 0;
             int failures = 0;
             foreach (var c in targets)
@@ -700,11 +723,15 @@ public partial class BuildReleaseForm : UserControl
             if (failures == 0)
             {
                 AppendLog($"\n✔ All {targets.Count} build(s) completed.");
+                if (_zipAfterBuild)
+                    ZipOutputBase();
                 SetStatus("✔ Build complete.", Color.DarkGreen);
             }
             else
             {
                 AppendLog($"\n⚠ Completed with {failures}/{targets.Count} failure(s).");
+                if (_zipAfterBuild)
+                    AppendLog($"  ⏭ Skipping zip — build had failure(s).");
                 SetStatus($"⚠ {failures} failed.", Color.DarkOrange);
             }
         }
@@ -931,6 +958,81 @@ public partial class BuildReleaseForm : UserControl
         return (owning.ToList(), changed);
     }
 
+    /// <summary>
+    /// Empties every destination folder this run will write to — each target config's
+    /// own output folder plus any redistribute-target folders — exactly once, BEFORE
+    /// the build loop. Doing it upfront (rather than per-config) means a config that
+    /// redistributes into another config's folder won't have its files wiped after copy.
+    /// Only the named sub-folders are cleared; files directly in OutputBasePath (e.g. a
+    /// previous .zip) are left untouched.
+    /// </summary>
+    private void CleanDestinations(List<BuildConfig> targets)
+    {
+        var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in targets)
+        {
+            var p = BuildFullOutputPath(c);
+            if (!string.IsNullOrWhiteSpace(p))
+            {
+                try { folders.Add(Path.GetFullPath(p)); } catch { /* skip */ }
+            }
+            foreach (var name in c.RedistributeTo ?? new List<string>())
+            {
+                var t = _configs.FirstOrDefault(x =>
+                    string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+                if (t == null) continue;
+                var tp = BuildFullOutputPath(t);
+                if (!string.IsNullOrWhiteSpace(tp))
+                {
+                    try { folders.Add(Path.GetFullPath(tp)); } catch { /* skip */ }
+                }
+            }
+        }
+
+        if (folders.Count == 0) return;
+        AppendLog($"\n🧹 Cleaning {folders.Count} destination folder(s)...");
+        foreach (var folder in folders)
+        {
+            if (!Directory.Exists(folder)) continue;
+            try
+            {
+                var n = BuildHelper.ClearDirectoryContents(folder);
+                AppendLog($"  ✔ Cleaned {n} item(s): {folder}");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"  ⚠ Could not clean {folder}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Zips the whole Output Base folder into "&lt;folderName&gt;.zip" placed inside it.
+    /// Called after a successful build run when "Zip output" is enabled.
+    /// </summary>
+    private void ZipOutputBase()
+    {
+        if (string.IsNullOrWhiteSpace(_outputBasePath))
+        {
+            AppendLog($"\n  ⚠ Zip skipped — Output Base is empty.");
+            return;
+        }
+        if (!Directory.Exists(_outputBasePath))
+        {
+            AppendLog($"\n  ⚠ Zip skipped — Output Base not found: {_outputBasePath}");
+            return;
+        }
+        AppendLog($"\n  Zipping output base: {_outputBasePath}");
+        try
+        {
+            BuildHelper.ZipOutputFolder(_outputBasePath, msg => AppendLog(msg));
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"  ✘ Zip failed: {ex.Message}");
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private List<BuildConfig> GetCheckedConfigs()
@@ -962,6 +1064,8 @@ public partial class BuildReleaseForm : UserControl
         btnPreview.Enabled = !busy;
         btnBuildChecked.Enabled = !busy;
         btnBuildAll.Enabled = !busy;
+        chkZipOutput.Enabled = !busy;
+        chkCleanFirst.Enabled = !busy;
         clbConfigs.Enabled = !busy;
         UpdateDetailEnabled();
         if (msg != null) SetStatus(msg, Color.DarkGray);

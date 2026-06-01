@@ -22,6 +22,16 @@ public class BuildSettings
         new() { ".dll", ".exe", ".pdb", ".xml", ".exe.config" };
     public string GitBaseBranch { get; set; } = "dev";
     public string GitCompareBranch { get; set; } = "HEAD";
+
+    /// <summary>When true, the destination output folder(s) of the configs being built
+    /// (and their redistribute targets) are emptied once before the build run, so stale
+    /// artifacts from previous builds don't leak into the release.</summary>
+    public bool CleanOutputFirst { get; set; } = true;
+
+    /// <summary>When true, after a successful build run the whole OutputBasePath
+    /// folder is zipped into "&lt;folderName&gt;.zip" placed inside that folder.</summary>
+    public bool ZipAfterBuild { get; set; } = true;
+
     public List<BuildConfig> Configs { get; set; } = new();
 
     public string GetFinalOutputPath(BuildConfig c)

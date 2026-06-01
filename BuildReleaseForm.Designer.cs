@@ -48,6 +48,8 @@ partial class BuildReleaseForm
     private Button btnPreview;
     private Button btnBuildChecked;
     private Button btnBuildAll;
+    private CheckBox chkCleanFirst;
+    private CheckBox chkZipOutput;
     private Label lblStatus;
     private ProgressBar progressBar;
 
@@ -102,6 +104,8 @@ partial class BuildReleaseForm
         btnPreview = new Button();
         btnBuildChecked = new Button();
         btnBuildAll = new Button();
+        chkCleanFirst = new CheckBox();
+        chkZipOutput = new CheckBox();
         lblStatus = new Label();
         progressBar = new ProgressBar();
         txtLog = new TextBox();
@@ -500,6 +504,8 @@ partial class BuildReleaseForm
         pnlActions.Controls.Add(btnPreview);
         pnlActions.Controls.Add(btnBuildChecked);
         pnlActions.Controls.Add(btnBuildAll);
+        pnlActions.Controls.Add(chkCleanFirst);
+        pnlActions.Controls.Add(chkZipOutput);
         pnlActions.Controls.Add(lblStatus);
         pnlActions.Location = new Point(8, 424);
         pnlActions.Name = "pnlActions";
@@ -545,22 +551,44 @@ partial class BuildReleaseForm
         btnBuildAll.Text = "Build All";
         btnBuildAll.UseVisualStyleBackColor = false;
         btnBuildAll.Click += btnBuildAll_Click;
-        // 
+        //
+        // chkCleanFirst
+        //
+        chkCleanFirst.AutoSize = true;
+        chkCleanFirst.Location = new Point(556, 4);
+        chkCleanFirst.Name = "chkCleanFirst";
+        chkCleanFirst.Size = new Size(95, 19);
+        chkCleanFirst.TabIndex = 3;
+        chkCleanFirst.Text = "Clean first";
+        chkCleanFirst.UseVisualStyleBackColor = true;
+        chkCleanFirst.CheckedChanged += chkCleanFirst_CheckedChanged;
+        //
+        // chkZipOutput
+        //
+        chkZipOutput.AutoSize = true;
+        chkZipOutput.Location = new Point(556, 24);
+        chkZipOutput.Name = "chkZipOutput";
+        chkZipOutput.Size = new Size(95, 19);
+        chkZipOutput.TabIndex = 4;
+        chkZipOutput.Text = "Zip output";
+        chkZipOutput.UseVisualStyleBackColor = true;
+        chkZipOutput.CheckedChanged += chkZipOutput_CheckedChanged;
+        //
         // lblStatus
-        // 
+        //
         lblStatus.AutoEllipsis = true;
         lblStatus.ForeColor = Color.DarkGray;
-        lblStatus.Location = new Point(556, 14);
+        lblStatus.Location = new Point(660, 14);
         lblStatus.Name = "lblStatus";
-        lblStatus.Size = new Size(199, 18);
-        lblStatus.TabIndex = 3;
-        // 
+        lblStatus.Size = new Size(90, 18);
+        lblStatus.TabIndex = 5;
+        //
         // progressBar
-        // 
+        //
         progressBar.Location = new Point(753, 10);
         progressBar.Name = "progressBar";
         progressBar.Size = new Size(111, 24);
-        progressBar.TabIndex = 4;
+        progressBar.TabIndex = 6;
         progressBar.Visible = false;
         // 
         // txtLog
