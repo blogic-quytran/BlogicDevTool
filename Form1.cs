@@ -17,6 +17,20 @@ public partial class Form1 : Form
             c.MouseMove += Form_MouseMove;
             c.MouseUp   += Form_MouseUp;
         }
+        AppBusyState.Changed += OnAppBusyChanged;
+        Disposed += (_, _) => AppBusyState.Changed -= OnAppBusyChanged;
+    }
+
+    /// <summary>
+    /// While any feature operation is in progress, disable the navigation buttons
+    /// so the user cannot switch tabs (which would dispose the running control).
+    /// </summary>
+    private void OnAppBusyChanged(bool busy)
+    {
+        if (IsDisposed) return;
+        if (InvokeRequired) { BeginInvoke(() => OnAppBusyChanged(busy)); return; }
+        foreach (var btn in new[] { btnNavDatabase, btnNavIis, btnNavUnzip, btnNavSqlManager, btnNavBuild })
+            btn.Enabled = !busy;
     }
 
     private void Form_MouseDown(object? sender, MouseEventArgs e)
@@ -85,28 +99,35 @@ public partial class Form1 : Form
 
     // ── Nav handlers ─────────────────────────────────────────────
     private void menuItemDatabaseTools_Click(object sender, EventArgs e)
-        => ShowDatabaseTools();
+    {
+        if (AppBusyState.IsBusy) return;
+        ShowDatabaseTools();
+    }
 
     private void menuItemIisManager_Click(object sender, EventArgs e)
     {
+        if (AppBusyState.IsBusy) return;
         SetActiveNav(btnNavIis);
         ShowInPanel(() => new IisServiceManagerForm(_sqlProfile));
     }
 
     private void menuItemUnzip_Click(object sender, EventArgs e)
     {
+        if (AppBusyState.IsBusy) return;
         SetActiveNav(btnNavUnzip);
         ShowInPanel(() => new UnzipWorkbenchForm(_sqlProfile));
     }
 
     private void menuItemSqlManager_Click(object sender, EventArgs e)
     {
+        if (AppBusyState.IsBusy) return;
         SetActiveNav(btnNavSqlManager);
         ShowInPanel(() => new SqlServerManagerForm());
     }
 
     private void menuItemBuildRelease_Click(object sender, EventArgs e)
     {
+        if (AppBusyState.IsBusy) return;
         SetActiveNav(btnNavBuild);
         ShowInPanel(() => new BuildReleaseForm());
     }

@@ -477,6 +477,7 @@ public partial class SqlServerManagerForm : UserControl
 
     private void SetBusy(bool busy, string? message = null)
     {
+        AppBusyState.IsBusy = busy;
         pbStatus.Style   = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Blocks;
         pbStatus.Visible = busy;
         if (message != null)

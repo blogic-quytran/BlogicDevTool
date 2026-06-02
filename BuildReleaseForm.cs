@@ -91,6 +91,24 @@ public partial class BuildReleaseForm : UserControl
             : Path.Combine(_outputBasePath, folder);
     }
 
+    /// <summary>
+    /// Where ExtraFolders (Templates, Language, …) should land for a given DLL
+    /// destination. When DLLs go into a "bin" sub-folder (e.g. Server/bin), the
+    /// assets belong BESIDE bin (Server/), matching the runtime layout — so we
+    /// return the parent. Otherwise (POS, BO, …) they go into the destination itself.
+    /// </summary>
+    private static string ExtraFoldersDestination(string dllDestination)
+    {
+        if (string.IsNullOrWhiteSpace(dllDestination)) return dllDestination;
+        var trimmed = dllDestination.TrimEnd('\\', '/');
+        if (string.Equals(Path.GetFileName(trimmed), "bin", StringComparison.OrdinalIgnoreCase))
+        {
+            var parent = Path.GetDirectoryName(trimmed);
+            if (!string.IsNullOrEmpty(parent)) return parent;
+        }
+        return dllDestination;
+    }
+
     private BuildSettings BuildSettingsSnapshot() =>
         new()
         {
@@ -851,12 +869,15 @@ public partial class BuildReleaseForm : UserControl
 
         if (c.ExtraFolders != null && c.ExtraFolders.Count > 0)
         {
+            var extraDest = ExtraFoldersDestination(destPath);
             var filterNote = extraFolderFilter != null
                 ? $" (git filter: {extraFolderFilter.Count} filename(s))"
                 : "";
             AppendLog($"\n  Copying extra folders{filterNote}: {string.Join(", ", c.ExtraFolders)}");
+            if (!string.Equals(extraDest, destPath, StringComparison.OrdinalIgnoreCase))
+                AppendLog($"    (beside bin → {extraDest})");
             var extraCopied = BuildHelper.CopyExtraFolders(
-                allArts, c.ExtraFolders, destPath, extraFolderFilter,
+                allArts, c.ExtraFolders, extraDest, extraFolderFilter,
                 msg => AppendLog($"    {msg}"));
             AppendLog($"  ✔ Extra folders: {extraCopied} file(s).");
         }
@@ -892,8 +913,9 @@ public partial class BuildReleaseForm : UserControl
 
                 if (c.ExtraFolders != null && c.ExtraFolders.Count > 0)
                 {
+                    var rExtraDest = ExtraFoldersDestination(targetPath);
                     var rExtra = BuildHelper.CopyExtraFolders(
-                        allArts, c.ExtraFolders, targetPath, extraFolderFilter,
+                        allArts, c.ExtraFolders, rExtraDest, extraFolderFilter,
                         msg => AppendLog($"      {msg}"));
                     AppendLog($"    ✔ Extra folders to '{target.Name}': {rExtra} file(s).");
                 }
@@ -969,23 +991,39 @@ public partial class BuildReleaseForm : UserControl
     private void CleanDestinations(List<BuildConfig> targets)
     {
         var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void AddFull(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return;
+            try { folders.Add(Path.GetFullPath(path)); } catch { /* skip */ }
+        }
+
+        // Adds the DLL destination plus each extra-folder destination (which, for a
+        // "bin"-style layout, sits beside bin rather than inside it). This keeps the
+        // clean step in sync with where the copy step actually writes.
+        void AddDestination(string dllDest, IReadOnlyList<string>? extraFolders)
+        {
+            AddFull(dllDest);
+            if (extraFolders == null || extraFolders.Count == 0) return;
+            var extraDest = ExtraFoldersDestination(dllDest);
+            foreach (var name in extraFolders)
+            {
+                var folderName = name.Trim().Trim('/', '\\');
+                if (folderName.Length > 0)
+                    AddFull(Path.Combine(extraDest, folderName));
+            }
+        }
+
         foreach (var c in targets)
         {
-            var p = BuildFullOutputPath(c);
-            if (!string.IsNullOrWhiteSpace(p))
-            {
-                try { folders.Add(Path.GetFullPath(p)); } catch { /* skip */ }
-            }
+            AddDestination(BuildFullOutputPath(c), c.ExtraFolders);
             foreach (var name in c.RedistributeTo ?? new List<string>())
             {
                 var t = _configs.FirstOrDefault(x =>
                     string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
                 if (t == null) continue;
-                var tp = BuildFullOutputPath(t);
-                if (!string.IsNullOrWhiteSpace(tp))
-                {
-                    try { folders.Add(Path.GetFullPath(tp)); } catch { /* skip */ }
-                }
+                // Redistribute copies THIS config's artifacts + extra folders into the target.
+                AddDestination(BuildFullOutputPath(t), c.ExtraFolders);
             }
         }
 
@@ -1055,6 +1093,7 @@ public partial class BuildReleaseForm : UserControl
     private void SetBusy(bool busy, string? msg = null)
     {
         _isBusy = busy;
+        AppBusyState.IsBusy = busy;
         progressBar.Style = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Blocks;
         progressBar.Visible = busy;
         btnAdd.Enabled = !busy;

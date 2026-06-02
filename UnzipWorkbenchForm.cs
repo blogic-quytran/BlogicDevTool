@@ -427,6 +427,7 @@ public partial class UnzipWorkbenchForm : UserControl
     private void SetBusy(bool busy, string? statusText = null)
     {
         if (InvokeRequired) { Invoke(() => SetBusy(busy, statusText)); return; }
+        AppBusyState.IsBusy = busy;
         btnRun.Enabled            = !busy && lstSqlFiles.Items.Count > 0 && _profile != null;
         btnDeploy.Enabled         = !busy && File.Exists(txtZipPath.Text.Trim());
         btnBrowseZip.Enabled      = !busy;

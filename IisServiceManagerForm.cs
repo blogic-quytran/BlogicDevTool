@@ -315,6 +315,59 @@ public partial class IisServiceManagerForm : UserControl
         finally { SetBusy(false); refreshDgv(); }
     }
 
+    private async void btnResetPath_Click(object sender, EventArgs e)
+    {
+        if (_selected == null) { ShowWarn("Please select an application."); return; }
+
+        var defPath = IisDefaultPathStore.GetDefaultPath(_selected.SiteName, _selected.AppPath);
+        if (string.IsNullOrWhiteSpace(defPath))
+        {
+            ShowWarn($"No default path defined for {_selected.SiteName}{_selected.AppPath}.");
+            return;
+        }
+
+        static string Norm(string p) => p.TrimEnd('\\', '/');
+        if (Norm(defPath).Equals(Norm(_selected.PhysicalPath), StringComparison.OrdinalIgnoreCase))
+        {
+            ShowWarn("Current path already matches the default.");
+            return;
+        }
+
+        var confirmMsg =
+            $"Reset path to DEFAULT for: {_selected.SiteName}{_selected.AppPath}\n\n" +
+            $"• Current path: {_selected.PhysicalPath}\n" +
+            $"• Default path: {defPath}\n\n" +
+            "Will backup current snapshot and restart IIS. Continue?";
+
+        if (MessageBox.Show(confirmMsg, "Confirm Reset Path",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            return;
+
+        SetBusy(true, "Resetting path to default...");
+        try
+        {
+            IisLocalStore.SaveSnapshot(_selected);
+
+            await Task.Run(() =>
+                IisHelper.SetPhysicalPath(_selected.SiteName, _selected.AppPath, defPath));
+
+            SetStatus("Restarting IIS...");
+            await IisHelper.RestartIisAsync();
+
+            SetStatus($"✔ Path reset to default → {defPath}");
+            MessageBox.Show("Path reset to default successfully!\nIIS has been restarted.", "Success",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            await RefreshSelectedEntry();
+        }
+        catch (Exception ex)
+        {
+            ShowError("Error resetting path:\n" + ex.Message);
+            SetStatus("Error.");
+        }
+        finally { SetBusy(false); refreshDgv(); }
+    }
+
     private async void btnRestorePatch_Click(object sender, EventArgs e)
     {
         if (_selected == null) { ShowWarn("Please select an application."); return; }
@@ -428,12 +481,14 @@ public partial class IisServiceManagerForm : UserControl
 
     private void SetBusy(bool busy, string? msg = null)
     {
+        AppBusyState.IsBusy = busy;
         progressBar.Visible = busy;
         btnRefresh.Enabled = !busy;
         btnTroubleshoot.Enabled = !busy;
         btnChange.Enabled = !busy;
         btnResetDb.Enabled = !busy;
         btnChangePath.Enabled = !busy;
+        btnResetPath.Enabled = !busy;
         btnRestorePatch.Enabled = !busy;
         btnRestartIis.Enabled = !busy;
         if (msg != null) SetStatus(msg);

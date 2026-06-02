@@ -35,6 +35,7 @@ partial class IisServiceManagerForm
     private System.Windows.Forms.Button btnChange;
     private System.Windows.Forms.Button btnResetDb;
     private System.Windows.Forms.Button btnChangePath;
+    private System.Windows.Forms.Button btnResetPath;
     private System.Windows.Forms.Button btnRestorePatch;
     private System.Windows.Forms.Button btnRestartIis;
 
@@ -73,6 +74,7 @@ partial class IisServiceManagerForm
         btnChange = new Button();
         btnResetDb = new Button();
         btnChangePath = new Button();
+        btnResetPath = new Button();
         btnRestorePatch = new Button();
         btnRestartIis = new Button();
         lblStatus = new Label();
@@ -341,9 +343,23 @@ partial class IisServiceManagerForm
         btnChangePath.Text = "📁  Update Patch";
         btnChangePath.UseVisualStyleBackColor = false;
         btnChangePath.Click += btnChangePath_Click;
-        // 
+        //
+        // btnResetPath
+        //
+        btnResetPath.BackColor = Color.FromArgb(200, 120, 40);
+        btnResetPath.FlatStyle = FlatStyle.Flat;
+        btnResetPath.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        btnResetPath.ForeColor = Color.White;
+        btnResetPath.Location = new Point(468, 522);
+        btnResetPath.Name = "btnResetPath";
+        btnResetPath.Size = new Size(150, 36);
+        btnResetPath.TabIndex = 9;
+        btnResetPath.Text = "↺  Reset Path";
+        btnResetPath.UseVisualStyleBackColor = false;
+        btnResetPath.Click += btnResetPath_Click;
+        //
         // btnRestorePatch
-        // 
+        //
         btnRestorePatch.BackColor = Color.FromArgb(90, 90, 90);
         btnRestorePatch.FlatStyle = FlatStyle.Flat;
         btnRestorePatch.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
@@ -404,6 +420,7 @@ partial class IisServiceManagerForm
         Controls.Add(btnChange);
         Controls.Add(btnResetDb);
         Controls.Add(btnChangePath);
+        Controls.Add(btnResetPath);
         Controls.Add(btnRestorePatch);
         Controls.Add(btnRestartIis);
         Controls.Add(progressBar);

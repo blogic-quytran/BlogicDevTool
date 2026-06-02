@@ -232,6 +232,7 @@ public partial class DatabaseToolsForm : UserControl
             $"TO DISK = N'{filePath}'\r\n" +
             $"WITH FORMAT, INIT, COMPRESSION, STATS = 10;\r\nGO";
 
+        AppBusyState.IsBusy = true;
         btnExecuteBackup.Enabled = false;
         lblBackupStatus.ForeColor = System.Drawing.Color.DarkGray;
         lblBackupStatus.Text = "Executing backup, please wait...";
@@ -254,6 +255,7 @@ public partial class DatabaseToolsForm : UserControl
         finally
         {
             btnExecuteBackup.Enabled = true;
+            AppBusyState.IsBusy = false;
         }
     }
 
@@ -477,6 +479,7 @@ public partial class DatabaseToolsForm : UserControl
             "Confirm Restore", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
         if (confirm != DialogResult.Yes) return;
 
+        AppBusyState.IsBusy = true;
         btnExecuteRestoreFromZip.Enabled = false;
         lblZipRestoreStatus.ForeColor = System.Drawing.Color.DarkGray;
 
@@ -550,6 +553,7 @@ public partial class DatabaseToolsForm : UserControl
         finally
         {
             btnExecuteRestoreFromZip.Enabled = true;
+            AppBusyState.IsBusy = false;
             if (!string.IsNullOrEmpty(tempBakPath) && System.IO.File.Exists(tempBakPath))
             {
                 try { System.IO.File.Delete(tempBakPath); } catch { /* ignore cleanup error */ }

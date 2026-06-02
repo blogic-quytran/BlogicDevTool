@@ -1,0 +1,13 @@
+{
+  "Defaults": [
+    { "SiteName": "Default Web Site", "AppPath": "/", "PhysicalPath": "C:\\inetpub\\wwwroot\\" },
+    { "SiteName": "Default Web Site", "AppPath": "/BLogicConnector", "PhysicalPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogicConnector" },
+    { "SiteName": "Default Web Site", "AppPath": "/BLogicKioskWeb", "PhysicalPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogicKioskWeb\\" },
+    { "SiteName": "Default Web Site", "AppPath": "/BLogicService", "PhysicalPath": "C:\\inetpub\\wwwroot\\BLogicService" },
+    { "SiteName": "Default Web Site", "AppPath": "/BLogicTransferMessageService", "PhysicalPath": "C:\\inetpub\\wwwroot\\BLogicTransferMessageService\\" },
+    { "SiteName": "Default Web Site", "AppPath": "/QOrderConnectorService", "PhysicalPath": "C:\\inetpub\\wwwroot\\QOrderConnectorService\\" },
+    { "SiteName": "Default Web Site", "AppPath": "/BLogicEmailService", "PhysicalPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Email Service\\" },
+    { "SiteName": "Default Web Site", "AppPath": "/BLogicMerchantService", "PhysicalPath": "C:\\inetpub\\wwwroot\\BLogicMerchantService\\" },
+    { "SiteName": "Default Web Site", "AppPath": "/BLogicPaymentService", "PhysicalPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Merchant\\BLogic Payment Service\\" }
+  ]
+}
