@@ -913,6 +913,7 @@ partial class SqlServerManagerForm
         Controls.Add(lblStatus);
         Name = "SqlServerManagerForm";
         Size = new Size(880, 670);
+        LayoutDynamicControls();
         tabMain.ResumeLayout(false);
         tabConnect.ResumeLayout(false);
         grpConn.ResumeLayout(false);
@@ -933,6 +934,59 @@ partial class SqlServerManagerForm
         grpNetStatus.PerformLayout();
         grpNetActions.ResumeLayout(false);
         ResumeLayout(false);
+    }
+
+    // ── Dynamic layout ────────────────────────────────────────────────────
+    // Positions, labels and styles every control that InitializeComponent leaves
+    // at (0,0) with no text. Called once at the end of InitializeComponent.
+    private void LayoutDynamicControls()
+    {
+        var blue  = Color.FromArgb(0, 120, 212);
+        var green = Color.FromArgb(46, 125, 50);
+        var red   = Color.FromArgb(200, 80, 50);
+        var gray  = Color.FromArgb(90, 90, 90);
+        var brown = Color.FromArgb(120, 90, 30);
+        var teal  = Color.FromArgb(0, 130, 130);
+
+        // ── Tab 1: Connect ──
+        MakeActionButton(btnTestConnect, "🔌  Test Connection", blue, 560, 100, 190, 42);
+
+        const int capX = 20, valX = 170, y0 = 34, step = 28;
+        MakeInfoRow(lblInfoServer,  lblInfoServerVal,  "Server Name:",    capX, valX, y0, 0);
+        MakeInfoRow(lblInfoVersion, lblInfoVersionVal, "Version:",        capX, valX, y0, step);
+        MakeInfoRow(lblInfoEdition, lblInfoEditionVal, "Edition:",        capX, valX, y0, step * 2);
+        MakeInfoRow(lblInfoMachine, lblInfoMachineVal, "Machine Name:",   capX, valX, y0, step * 3);
+        MakeInfoRow(lblInfoAuth,    lblInfoAuthVal,    "Authentication:", capX, valX, y0, step * 4);
+
+        // ── Tab 2: Login Accounts — grid toolbar ──
+        MakeToolButton(btnRefreshLogins, "⟳  Refresh", blue,  10,  12, 120, 32);
+        MakeToolButton(btnToggleLogin,   "✘  Disable", brown, 136, 12, 120, 32);
+        MakeToolButton(btnDeleteLogin,   "🗑  Delete",  red,   262, 12, 120, 32);
+
+        // Create / Edit Login action buttons
+        MakeActionButton(btnCreateLogin,     "➕  Create",      green, 12,  150, 120, 34);
+        MakeActionButton(btnConfigureLogin,  "⚙  Configure",   blue,  138, 150, 130, 34);
+        MakeActionButton(btnChangeLoginPass, "🔑  Change Pass", gray,  274, 150, 130, 34);
+        MakeActionButton(btnTestLogin,       "🔌  Test",        teal,  410, 150, 113, 34);
+
+        lblHint.AutoSize  = false;
+        lblHint.Font      = new Font("Segoe UI", 8.5F, FontStyle.Italic);
+        lblHint.ForeColor = Color.Gray;
+        lblHint.Location  = new Point(12, 190);
+        lblHint.Size      = new Size(515, 24);
+        lblHint.Text      = "Tip: 'Configure' sets the password + enables the login (+ sysadmin if checked). Works for 'sa' too.";
+
+        // Server Actions
+        MakeActionButton(btnEnableMixedMode,   "🔓  Mixed Mode", brown, 296, 24, 130, 34);
+        MakeActionButton(btnRestartSqlService, "⟳  Restart",     gray,  432, 24, 95,  34);
+
+        // ── Tab 3: Network / TCP-IP ──
+        MakeActionButton(btnCheckNetStatus, "🔍  Check Status", blue, 350, 30, 135, 42);
+
+        MakeActionButton(btnEnableTcpIp,       "1.  Enable TCP/IP",       green, 20, 40,  220, 40);
+        MakeActionButton(btnAddFirewallRule,   "2.  Add Firewall Rule",   blue,  20, 90,  220, 40);
+        MakeActionButton(btnNetRestartService, "3.  Restart SQL Service", brown, 20, 140, 220, 40);
+        MakeActionButton(btnDisableTcpIp,      "✘  Disable TCP/IP",       red,   20, 210, 220, 36);
     }
 
     // ── Layout helpers ────────────────────────────────────────────────────

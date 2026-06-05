@@ -23,6 +23,7 @@ partial class DatabaseToolsForm
     private System.Windows.Forms.GroupBox grpSqlPreviewB;
     private System.Windows.Forms.TextBox txtSqlPreviewB;
     private System.Windows.Forms.Label lblBackupStatus;
+    private System.Windows.Forms.ProgressBar pbBackup;
     private System.Windows.Forms.Button btnExecuteBackup;
 
     // ── Restore from ZIP tab ──────────────────────────────────────────────
@@ -48,6 +49,7 @@ partial class DatabaseToolsForm
     private System.Windows.Forms.GroupBox grpSqlPreviewZ;
     private System.Windows.Forms.TextBox txtSqlPreviewZ;
     private System.Windows.Forms.Label lblZipRestoreStatus;
+    private System.Windows.Forms.ProgressBar pbRestore;
     private System.Windows.Forms.Button btnExecuteRestoreFromZip;
     private System.Windows.Forms.CheckBox chkClearMailData;
     private System.Windows.Forms.GroupBox grpBakDirect;
@@ -76,6 +78,7 @@ partial class DatabaseToolsForm
         grpSqlPreviewB = new GroupBox();
         txtSqlPreviewB = new TextBox();
         lblBackupStatus = new Label();
+        pbBackup = new ProgressBar();
         btnExecuteBackup = new Button();
         tabRestoreZip = new TabPage();
         grpZipFile = new GroupBox();
@@ -105,6 +108,7 @@ partial class DatabaseToolsForm
         grpSqlPreviewZ = new GroupBox();
         txtSqlPreviewZ = new TextBox();
         lblZipRestoreStatus = new Label();
+        pbRestore = new ProgressBar();
         btnExecuteRestoreFromZip = new Button();
         tabControl.SuspendLayout();
         tabBackup.SuspendLayout();
@@ -146,6 +150,7 @@ partial class DatabaseToolsForm
         tabBackup.Controls.Add(grpBackupInfo);
         tabBackup.Controls.Add(grpSqlPreviewB);
         tabBackup.Controls.Add(lblBackupStatus);
+        tabBackup.Controls.Add(pbBackup);
         tabBackup.Controls.Add(btnExecuteBackup);
         tabBackup.Font = new Font("Segoe UI", 9F);
         tabBackup.Location = new Point(4, 26);
@@ -270,7 +275,18 @@ partial class DatabaseToolsForm
         lblBackupStatus.Size = new Size(640, 22);
         lblBackupStatus.TabIndex = 2;
         lblBackupStatus.Text = "Ready.";
-        // 
+        //
+        // pbBackup
+        //
+        pbBackup.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        pbBackup.Location = new Point(11, 588);
+        pbBackup.MarqueeAnimationSpeed = 30;
+        pbBackup.Name = "pbBackup";
+        pbBackup.Size = new Size(747, 8);
+        pbBackup.Style = ProgressBarStyle.Marquee;
+        pbBackup.TabIndex = 3;
+        pbBackup.Visible = false;
+        //
         // btnExecuteBackup
         // 
         btnExecuteBackup.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
@@ -294,6 +310,7 @@ partial class DatabaseToolsForm
         tabRestoreZip.Controls.Add(grpZipRestoreInfo);
         tabRestoreZip.Controls.Add(grpSqlPreviewZ);
         tabRestoreZip.Controls.Add(lblZipRestoreStatus);
+        tabRestoreZip.Controls.Add(pbRestore);
         tabRestoreZip.Controls.Add(btnExecuteRestoreFromZip);
         tabRestoreZip.Font = new Font("Segoe UI", 9F);
         tabRestoreZip.Location = new Point(4, 26);
@@ -604,7 +621,18 @@ partial class DatabaseToolsForm
         lblZipRestoreStatus.Size = new Size(640, 22);
         lblZipRestoreStatus.TabIndex = 4;
         lblZipRestoreStatus.Text = "Ready.";
-        // 
+        //
+        // pbRestore
+        //
+        pbRestore.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        pbRestore.Location = new Point(8, 585);
+        pbRestore.MarqueeAnimationSpeed = 30;
+        pbRestore.Name = "pbRestore";
+        pbRestore.Size = new Size(736, 8);
+        pbRestore.Style = ProgressBarStyle.Marquee;
+        pbRestore.TabIndex = 6;
+        pbRestore.Visible = false;
+        //
         // btnExecuteRestoreFromZip
         // 
         btnExecuteRestoreFromZip.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;

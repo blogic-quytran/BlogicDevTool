@@ -63,6 +63,8 @@ public partial class DatabaseToolsForm : UserControl
         InitializeComponent();
         cboDbNameB.Text = "BLogicPOS7";
         cboDbNameZ.Text = "BLogicPOS7";
+        // Block switching sub-tabs while a backup/restore is running.
+        tabControl.Selecting += (_, ev) => { if (AppBusyState.IsBusy) ev.Cancel = true; };
         SqlSessionStore.ProfileChanged += OnSessionProfileChanged;
         Disposed += (_, _) => SqlSessionStore.ProfileChanged -= OnSessionProfileChanged;
     }
@@ -121,6 +123,15 @@ public partial class DatabaseToolsForm : UserControl
     private void SetControlsEnabled(bool enabled)
     {
         tabControl.Enabled = enabled;
+    }
+
+    /// <summary>Enable/disable every control on a tab page (progress bar + status label
+    /// are kept enabled so they stay visible/animating during the operation).</summary>
+    private static void SetTabEnabled(TabPage tab, bool enabled, params Control[] keepEnabled)
+    {
+        foreach (Control c in tab.Controls)
+            if (Array.IndexOf(keepEnabled, c) < 0)
+                c.Enabled = enabled;
     }
 
     private async Task ConnectAndLoadAsync()
@@ -233,7 +244,8 @@ public partial class DatabaseToolsForm : UserControl
             $"WITH FORMAT, INIT, COMPRESSION, STATS = 10;\r\nGO";
 
         AppBusyState.IsBusy = true;
-        btnExecuteBackup.Enabled = false;
+        SetTabEnabled(tabBackup, false, pbBackup, lblBackupStatus);
+        pbBackup.Visible = true;
         lblBackupStatus.ForeColor = System.Drawing.Color.DarkGray;
         lblBackupStatus.Text = "Executing backup, please wait...";
 
@@ -254,7 +266,8 @@ public partial class DatabaseToolsForm : UserControl
         }
         finally
         {
-            btnExecuteBackup.Enabled = true;
+            SetTabEnabled(tabBackup, true);
+            pbBackup.Visible = false;
             AppBusyState.IsBusy = false;
         }
     }
@@ -480,7 +493,8 @@ public partial class DatabaseToolsForm : UserControl
         if (confirm != DialogResult.Yes) return;
 
         AppBusyState.IsBusy = true;
-        btnExecuteRestoreFromZip.Enabled = false;
+        SetTabEnabled(tabRestoreZip, false, pbRestore, lblZipRestoreStatus);
+        pbRestore.Visible = true;
         lblZipRestoreStatus.ForeColor = System.Drawing.Color.DarkGray;
 
         var tempBakPath = string.Empty;
@@ -552,7 +566,8 @@ public partial class DatabaseToolsForm : UserControl
         }
         finally
         {
-            btnExecuteRestoreFromZip.Enabled = true;
+            SetTabEnabled(tabRestoreZip, true);
+            pbRestore.Visible = false;
             AppBusyState.IsBusy = false;
             if (!string.IsNullOrEmpty(tempBakPath) && System.IO.File.Exists(tempBakPath))
             {

@@ -331,12 +331,13 @@ public partial class UnzipWorkbenchForm : UserControl
 
     private async Task DeployAsync(string zipPath, List<UnzipFolderMapping> mappings)
     {
-        // Backup root for files that are about to be overwritten. Placed under the tool's
-        // own folder ("backups\backup_<timestamp>"), created lazily on the first replaced
-        // file. Layout mirrors the ZIP/mapping structure: <FolderName>/<relativePath>.
-        var backupRoot = Path.Combine(
-            AppContext.BaseDirectory, "backups",
-            $"backup_{DateTime.Now:yyyyMMdd_HHmmss}");
+        // One backup per task, named after the ZIP (e.g. "PSS255"), under <toolDir>\backups\.
+        // Write-once & accumulating: re-deploying the same task only adds files not yet
+        // captured — so this single folder is the rollback point for the task.
+        var taskName = UnzipBackupStore.TaskName(zipPath);
+        var backupFolder = UnzipBackupStore.TaskFolder(taskName);
+        var added = UnzipBackupStore.LoadAdded(taskName);
+        AppendLog($">>> Task: {taskName}");
 
         AppendLog(">>> Step 1: Stopping IIS...");
         SetStatus("Stopping IIS...");
@@ -353,8 +354,7 @@ public partial class UnzipWorkbenchForm : UserControl
 
         AppendLog($"\n>>> Step 2: Extracting '{Path.GetFileName(zipPath)}'...");
         SetStatus("Extracting and copying files...");
-        int totalFiles = 0, skippedFolders = 0, backedUp = 0;
-        var createdBaseline = UnzipBaselineStore.LoadCreated();
+        int totalFiles = 0, skippedFolders = 0, newlyBackedUp = 0, newlyAdded = 0;
 
         try
         {
@@ -377,7 +377,6 @@ public partial class UnzipWorkbenchForm : UserControl
                 }
 
                 AppendLog($"\n  📁 {mapping.FolderName}  →  {destDir}");
-                var backupFolderName = mapping.FolderName.Trim().Trim('/', '\\');
                 int fileCount = 0;
 
                 foreach (var entry in entries)
@@ -395,36 +394,26 @@ public partial class UnzipWorkbenchForm : UserControl
 
                     if (existedBefore)
                     {
-                        // Per-deploy backup: the file's state right before THIS deploy.
-                        try
+                        // Save the original into the task backup — write-once, so a later
+                        // deploy of the same task only adds files not captured yet. Skip files
+                        // the task itself created earlier (they have no true original).
+                        if (!added.Contains(fullDest))
                         {
-                            var backupPath = Path.Combine(backupRoot, backupFolderName, relativePath);
-                            var backupSubDir = Path.GetDirectoryName(backupPath);
-                            if (!string.IsNullOrEmpty(backupSubDir))
-                                Directory.CreateDirectory(backupSubDir);
-                            File.Copy(destPath, backupPath, overwrite: true);
-                            backedUp++;
-                        }
-                        catch (Exception bex)
-                        {
-                            AppendLog($"     ⚠ Backup failed for {relativePath}: {bex.Message}");
-                        }
-
-                        // Write-once original baseline (skip files a previous deploy created —
-                        // those have no true original).
-                        if (!createdBaseline.Contains(fullDest))
-                        {
-                            try { UnzipBaselineStore.SaveOriginalIfAbsent(destPath); }
+                            try
+                            {
+                                if (UnzipBackupStore.SaveOriginalIfAbsent(taskName, destPath))
+                                    newlyBackedUp++;
+                            }
                             catch (Exception bx)
                             {
-                                AppendLog($"     ⚠ Baseline failed for {relativePath}: {bx.Message}");
+                                AppendLog($"     ⚠ Backup failed for {relativePath}: {bx.Message}");
                             }
                         }
                     }
                     else
                     {
-                        // Brand-new file → record so Restore Original can remove it.
-                        createdBaseline.Add(fullDest);
+                        // Brand-new file → track so rollback removes it.
+                        if (added.Add(fullDest)) newlyAdded++;
                     }
 
                     entry.ExtractToFile(destPath, overwrite: true);
@@ -437,14 +426,13 @@ public partial class UnzipWorkbenchForm : UserControl
             }
         });
 
-        UnzipBaselineStore.SaveCreated(createdBaseline);
+        UnzipBackupStore.SaveAdded(taskName, added);
 
         AppendLog($"\n  Total: {totalFiles} file(s) updated.");
-        if (backedUp > 0)
-            AppendLog($"  💾 Backed up {backedUp} replaced file(s) → {backupRoot}");
-        else
-            AppendLog($"  💾 No existing files were replaced — no per-deploy backup created.");
-        AppendLog($"  ↩ Original baseline kept at: {UnzipBaselineStore.BaselineLocation}  (use 'Restore Original' to roll back)");
+        AppendLog($"  💾 Backup '{taskName}' → {backupFolder}");
+        AppendLog($"     {newlyBackedUp} original(s) newly saved, {newlyAdded} new file(s) tracked"
+                  + $" (backup now holds {added.Count} added-file record(s)).");
+        AppendLog($"  ↩ Use 'Rollback Task' to restore this task to its original state.");
         if (skippedFolders > 0)
             AppendLog($"  ⚠ {skippedFolders} folder(s) skipped (not found in ZIP).");
         }
@@ -469,40 +457,49 @@ public partial class UnzipWorkbenchForm : UserControl
         SetStatus($"✔ Deployment complete — {totalFiles} file(s) updated.");
     }
 
-    // ── Restore Original ────────────────────────────────────────────────────────
+    // ── Rollback Task ─────────────────────────────────────────────────────────
 
     private async void btnRestoreOriginal_Click(object sender, EventArgs e)
     {
-        if (!UnzipBaselineStore.HasAnyBaseline())
+        var zip = txtZipPath.Text.Trim();
+        if (string.IsNullOrEmpty(zip))
         {
             MessageBox.Show(
-                "No original baseline has been captured yet.\nDeploy at least once first.",
-                "Restore Original", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "Select the task ZIP first so the matching backup can be identified.",
+                "Rollback Task", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var taskName = UnzipBackupStore.TaskName(zip);
+        if (!UnzipBackupStore.HasBackup(taskName))
+        {
+            MessageBox.Show(
+                $"No backup found for task '{taskName}'.\nDeploy this task at least once first.",
+                "Rollback Task", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
         var confirm = MessageBox.Show(
-            "Restore ALL deployed files to their ORIGINAL state?\n\n" +
+            $"Roll back task '{taskName}' to its ORIGINAL state?\n\n" +
             "Process will:\n" +
             "  1. Stop IIS\n" +
-            "  2. Overwrite current files with the captured originals\n" +
-            "  3. Delete files that were added by deploys\n" +
-            "  4. Restart IIS\n\n" +
-            "(Original = state before the very first deploy made with this tool.)",
-            "Confirm Restore Original",
+            "  2. Restore the original of every file this task replaced\n" +
+            "  3. Delete files this task added\n" +
+            "  4. Restart IIS",
+            "Confirm Rollback",
             MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
         if (confirm != DialogResult.Yes) return;
 
-        SetBusy(true, "Restoring original state...");
+        SetBusy(true, $"Rolling back '{taskName}'...");
         txtLog.Clear();
         try
         {
-            await RestoreOriginalAsync();
+            await RollbackTaskAsync(taskName);
         }
         catch (Exception ex)
         {
             AppendLog($"\n✘ Fatal error: {ex.Message}");
-            SetStatus("✘ Restore failed.");
+            SetStatus("✘ Rollback failed.");
         }
         finally
         {
@@ -510,8 +507,9 @@ public partial class UnzipWorkbenchForm : UserControl
         }
     }
 
-    private async Task RestoreOriginalAsync()
+    private async Task RollbackTaskAsync(string taskName)
     {
+        AppendLog($">>> Rolling back task: {taskName}");
         AppendLog(">>> Step 1: Stopping IIS...");
         SetStatus("Stopping IIS...");
         try
@@ -522,7 +520,7 @@ public partial class UnzipWorkbenchForm : UserControl
         catch (Exception ex)
         {
             AppendLog($"⚠ Warning while stopping IIS: {ex.Message}");
-            AppendLog("  Continuing restore...");
+            AppendLog("  Continuing rollback...");
         }
 
         try
@@ -530,17 +528,17 @@ public partial class UnzipWorkbenchForm : UserControl
             AppendLog("\n>>> Step 2: Restoring original files...");
             SetStatus("Restoring files...");
             int restored = 0, removed = 0, failed = 0;
-            var created = UnzipBaselineStore.LoadCreated();
+            var added = UnzipBackupStore.LoadAdded(taskName);
 
             await Task.Run(() =>
             {
                 // 1) Put back the captured originals (overwrite current).
-                foreach (var baselineFile in UnzipBaselineStore.EnumerateBaselineFiles())
+                foreach (var backupFile in UnzipBackupStore.EnumerateOriginals(taskName))
                 {
-                    var orig = UnzipBaselineStore.DecodeOriginalPath(baselineFile);
+                    var orig = UnzipBackupStore.DecodeOriginalPath(taskName, backupFile);
                     if (string.IsNullOrEmpty(orig))
                     {
-                        AppendLog($"  ⚠ Cannot map baseline file: {baselineFile}");
+                        AppendLog($"  ⚠ Cannot map backup file: {backupFile}");
                         continue;
                     }
                     try
@@ -548,7 +546,7 @@ public partial class UnzipWorkbenchForm : UserControl
                         var dir = Path.GetDirectoryName(orig);
                         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
                         if (File.Exists(orig)) File.SetAttributes(orig, FileAttributes.Normal);
-                        File.Copy(baselineFile, orig, overwrite: true);
+                        File.Copy(backupFile, orig, overwrite: true);
                         restored++;
                         AppendLog($"  ↩ {orig}");
                     }
@@ -559,8 +557,8 @@ public partial class UnzipWorkbenchForm : UserControl
                     }
                 }
 
-                // 2) Delete files that deploys created (did not exist originally).
-                foreach (var p in created)
+                // 2) Delete files this task added (did not exist originally).
+                foreach (var p in added)
                 {
                     try
                     {
@@ -582,7 +580,7 @@ public partial class UnzipWorkbenchForm : UserControl
 
             AppendLog($"\n  Restored {restored} original file(s); removed {removed} added file(s)."
                       + (failed > 0 ? $"  ⚠ {failed} failure(s)." : ""));
-            SetStatus($"✔ Restored to original — {restored} restored, {removed} removed.");
+            SetStatus($"✔ Task '{taskName}' rolled back — {restored} restored, {removed} removed.");
         }
         finally
         {
@@ -599,7 +597,7 @@ public partial class UnzipWorkbenchForm : UserControl
             }
         }
 
-        AppendLog($"\n✔ Restore completed at {DateTime.Now:HH:mm:ss}.");
+        AppendLog($"\n✔ Rollback completed at {DateTime.Now:HH:mm:ss}.");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

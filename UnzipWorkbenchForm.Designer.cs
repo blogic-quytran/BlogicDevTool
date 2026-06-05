@@ -366,7 +366,7 @@ partial class UnzipWorkbenchForm
         btnRestoreOriginal.Name = "btnRestoreOriginal";
         btnRestoreOriginal.Size = new Size(226, 30);
         btnRestoreOriginal.TabIndex = 0;
-        btnRestoreOriginal.Text = "↩ Restore Original";
+        btnRestoreOriginal.Text = "↩ Rollback Task";
         btnRestoreOriginal.UseVisualStyleBackColor = false;
         btnRestoreOriginal.Click += btnRestoreOriginal_Click;
         //
