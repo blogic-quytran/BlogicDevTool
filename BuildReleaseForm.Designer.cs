@@ -43,6 +43,7 @@ partial class BuildReleaseForm
     private TextBox txtGitBase;
     private Label lblGitCompare;
     private TextBox txtGitCompare;
+    private CheckBox chkIncludeUncommitted;
 
     private Panel pnlActions;
     private Button btnPreview;
@@ -74,6 +75,7 @@ partial class BuildReleaseForm
         btnExtensions = new Button();
         lblGitBase = new Label();
         lblGitCompare = new Label();
+        chkIncludeUncommitted = new CheckBox();
         pnlList = new Panel();
         btnAdd = new Button();
         btnDelete = new Button();
@@ -130,9 +132,10 @@ partial class BuildReleaseForm
         pnlGlobal.Controls.Add(btnExtensions);
         pnlGlobal.Controls.Add(lblGitBase);
         pnlGlobal.Controls.Add(lblGitCompare);
+        pnlGlobal.Controls.Add(chkIncludeUncommitted);
         pnlGlobal.Location = new Point(8, 8);
         pnlGlobal.Name = "pnlGlobal";
-        pnlGlobal.Size = new Size(864, 64);
+        pnlGlobal.Size = new Size(864, 88);
         pnlGlobal.TabIndex = 0;
         // 
         // txtGitCompare
@@ -220,16 +223,27 @@ partial class BuildReleaseForm
         lblGitCompare.TabIndex = 7;
         lblGitCompare.Text = "Git Compare:";
         lblGitCompare.TextAlign = ContentAlignment.MiddleLeft;
-        // 
+        //
+        // chkIncludeUncommitted
+        //
+        chkIncludeUncommitted.AutoSize = true;
+        chkIncludeUncommitted.Location = new Point(141, 64);
+        chkIncludeUncommitted.Name = "chkIncludeUncommitted";
+        chkIncludeUncommitted.Size = new Size(360, 19);
+        chkIncludeUncommitted.TabIndex = 9;
+        chkIncludeUncommitted.Text = "Include uncommitted changes (staged + working tree + untracked)";
+        chkIncludeUncommitted.UseVisualStyleBackColor = true;
+        chkIncludeUncommitted.CheckedChanged += chkIncludeUncommitted_CheckedChanged;
+        //
         // pnlList
-        // 
+        //
         pnlList.BorderStyle = BorderStyle.FixedSingle;
         pnlList.Controls.Add(btnAdd);
         pnlList.Controls.Add(btnDelete);
         pnlList.Controls.Add(btnMoveUp);
         pnlList.Controls.Add(btnMoveDown);
         pnlList.Controls.Add(clbConfigs);
-        pnlList.Location = new Point(8, 80);
+        pnlList.Location = new Point(8, 104);
         pnlList.Name = "pnlList";
         pnlList.Size = new Size(380, 340);
         pnlList.TabIndex = 1;
@@ -309,7 +323,7 @@ partial class BuildReleaseForm
         pnlDetail.Controls.Add(chkFilterGit);
         pnlDetail.Controls.Add(lblFilterInfo);
         pnlDetail.Controls.Add(btnSaveConfig);
-        pnlDetail.Location = new Point(394, 80);
+        pnlDetail.Location = new Point(394, 104);
         pnlDetail.Name = "pnlDetail";
         pnlDetail.Size = new Size(478, 340);
         pnlDetail.TabIndex = 2;
@@ -507,7 +521,7 @@ partial class BuildReleaseForm
         pnlActions.Controls.Add(chkCleanFirst);
         pnlActions.Controls.Add(chkZipOutput);
         pnlActions.Controls.Add(lblStatus);
-        pnlActions.Location = new Point(8, 424);
+        pnlActions.Location = new Point(8, 448);
         pnlActions.Name = "pnlActions";
         pnlActions.Size = new Size(864, 44);
         pnlActions.TabIndex = 3;
@@ -596,7 +610,7 @@ partial class BuildReleaseForm
         txtLog.BackColor = Color.FromArgb(30, 30, 30);
         txtLog.Font = new Font("Consolas", 9F);
         txtLog.ForeColor = Color.LightGray;
-        txtLog.Location = new Point(8, 472);
+        txtLog.Location = new Point(8, 496);
         txtLog.Multiline = true;
         txtLog.Name = "txtLog";
         txtLog.ReadOnly = true;
@@ -615,7 +629,7 @@ partial class BuildReleaseForm
         Controls.Add(pnlActions);
         Controls.Add(txtLog);
         Name = "BuildReleaseForm";
-        Size = new Size(880, 696);
+        Size = new Size(880, 720);
         pnlGlobal.ResumeLayout(false);
         pnlGlobal.PerformLayout();
         pnlList.ResumeLayout(false);

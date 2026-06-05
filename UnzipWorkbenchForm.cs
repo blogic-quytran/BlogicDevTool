@@ -306,7 +306,7 @@ public partial class UnzipWorkbenchForm : UserControl
         var confirm = MessageBox.Show(
             $"Confirm deployment?\n\nZIP file: {Path.GetFileName(zipPath)}\n" +
             $"Folders to update: {mappings.Count}\n\n" +
-            "Process will:\n  1. Stop IIS\n  2. Extract and copy files\n  3. Restart IIS",
+            "Process will:\n  1. Stop IIS\n  2. Back up files being replaced, then extract & copy\n  3. Restart IIS",
             "Confirm Deployment",
             MessageBoxButtons.YesNo, MessageBoxIcon.Question);
         if (confirm != DialogResult.Yes) return;
@@ -331,6 +331,13 @@ public partial class UnzipWorkbenchForm : UserControl
 
     private async Task DeployAsync(string zipPath, List<UnzipFolderMapping> mappings)
     {
+        // Backup root for files that are about to be overwritten. Placed under the tool's
+        // own folder ("backups\backup_<timestamp>"), created lazily on the first replaced
+        // file. Layout mirrors the ZIP/mapping structure: <FolderName>/<relativePath>.
+        var backupRoot = Path.Combine(
+            AppContext.BaseDirectory, "backups",
+            $"backup_{DateTime.Now:yyyyMMdd_HHmmss}");
+
         AppendLog(">>> Step 1: Stopping IIS...");
         SetStatus("Stopping IIS...");
         try
@@ -346,8 +353,11 @@ public partial class UnzipWorkbenchForm : UserControl
 
         AppendLog($"\n>>> Step 2: Extracting '{Path.GetFileName(zipPath)}'...");
         SetStatus("Extracting and copying files...");
-        int totalFiles = 0, skippedFolders = 0;
+        int totalFiles = 0, skippedFolders = 0, backedUp = 0;
+        var createdBaseline = UnzipBaselineStore.LoadCreated();
 
+        try
+        {
         await Task.Run(() =>
         {
             using var archive = ZipFile.OpenRead(zipPath);
@@ -367,6 +377,7 @@ public partial class UnzipWorkbenchForm : UserControl
                 }
 
                 AppendLog($"\n  📁 {mapping.FolderName}  →  {destDir}");
+                var backupFolderName = mapping.FolderName.Trim().Trim('/', '\\');
                 int fileCount = 0;
 
                 foreach (var entry in entries)
@@ -378,6 +389,44 @@ public partial class UnzipWorkbenchForm : UserControl
                     var destSubDir = Path.GetDirectoryName(destPath);
                     if (!string.IsNullOrEmpty(destSubDir))
                         Directory.CreateDirectory(destSubDir);
+
+                    var fullDest = Path.GetFullPath(destPath);
+                    bool existedBefore = File.Exists(destPath);
+
+                    if (existedBefore)
+                    {
+                        // Per-deploy backup: the file's state right before THIS deploy.
+                        try
+                        {
+                            var backupPath = Path.Combine(backupRoot, backupFolderName, relativePath);
+                            var backupSubDir = Path.GetDirectoryName(backupPath);
+                            if (!string.IsNullOrEmpty(backupSubDir))
+                                Directory.CreateDirectory(backupSubDir);
+                            File.Copy(destPath, backupPath, overwrite: true);
+                            backedUp++;
+                        }
+                        catch (Exception bex)
+                        {
+                            AppendLog($"     ⚠ Backup failed for {relativePath}: {bex.Message}");
+                        }
+
+                        // Write-once original baseline (skip files a previous deploy created —
+                        // those have no true original).
+                        if (!createdBaseline.Contains(fullDest))
+                        {
+                            try { UnzipBaselineStore.SaveOriginalIfAbsent(destPath); }
+                            catch (Exception bx)
+                            {
+                                AppendLog($"     ⚠ Baseline failed for {relativePath}: {bx.Message}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Brand-new file → record so Restore Original can remove it.
+                        createdBaseline.Add(fullDest);
+                    }
+
                     entry.ExtractToFile(destPath, overwrite: true);
                     fileCount++;
                     totalFiles++;
@@ -388,24 +437,169 @@ public partial class UnzipWorkbenchForm : UserControl
             }
         });
 
+        UnzipBaselineStore.SaveCreated(createdBaseline);
+
         AppendLog($"\n  Total: {totalFiles} file(s) updated.");
+        if (backedUp > 0)
+            AppendLog($"  💾 Backed up {backedUp} replaced file(s) → {backupRoot}");
+        else
+            AppendLog($"  💾 No existing files were replaced — no per-deploy backup created.");
+        AppendLog($"  ↩ Original baseline kept at: {UnzipBaselineStore.BaselineLocation}  (use 'Restore Original' to roll back)");
         if (skippedFolders > 0)
             AppendLog($"  ⚠ {skippedFolders} folder(s) skipped (not found in ZIP).");
-
-        AppendLog("\n>>> Step 3: Restarting IIS...");
-        SetStatus("Restarting IIS...");
-        try
-        {
-            await IisHelper.StartIisAsync();
-            AppendLog("✔ IIS started.");
         }
-        catch (Exception ex)
+        finally
         {
-            AppendLog($"⚠ Warning while starting IIS: {ex.Message}");
+            // Always restart IIS — even if extraction failed midway — so the machine
+            // never gets left with IIS stopped.
+            AppendLog("\n>>> Step 3: Restarting IIS...");
+            SetStatus("Restarting IIS...");
+            try
+            {
+                await IisHelper.StartIisAsync();
+                AppendLog("✔ IIS started.");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"⚠ Warning while starting IIS: {ex.Message}");
+            }
         }
 
         AppendLog($"\n✔ Deployment completed at {DateTime.Now:HH:mm:ss}.");
         SetStatus($"✔ Deployment complete — {totalFiles} file(s) updated.");
+    }
+
+    // ── Restore Original ────────────────────────────────────────────────────────
+
+    private async void btnRestoreOriginal_Click(object sender, EventArgs e)
+    {
+        if (!UnzipBaselineStore.HasAnyBaseline())
+        {
+            MessageBox.Show(
+                "No original baseline has been captured yet.\nDeploy at least once first.",
+                "Restore Original", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            "Restore ALL deployed files to their ORIGINAL state?\n\n" +
+            "Process will:\n" +
+            "  1. Stop IIS\n" +
+            "  2. Overwrite current files with the captured originals\n" +
+            "  3. Delete files that were added by deploys\n" +
+            "  4. Restart IIS\n\n" +
+            "(Original = state before the very first deploy made with this tool.)",
+            "Confirm Restore Original",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+        if (confirm != DialogResult.Yes) return;
+
+        SetBusy(true, "Restoring original state...");
+        txtLog.Clear();
+        try
+        {
+            await RestoreOriginalAsync();
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"\n✘ Fatal error: {ex.Message}");
+            SetStatus("✘ Restore failed.");
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private async Task RestoreOriginalAsync()
+    {
+        AppendLog(">>> Step 1: Stopping IIS...");
+        SetStatus("Stopping IIS...");
+        try
+        {
+            await IisHelper.StopIisAsync();
+            AppendLog("✔ IIS stopped.");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"⚠ Warning while stopping IIS: {ex.Message}");
+            AppendLog("  Continuing restore...");
+        }
+
+        try
+        {
+            AppendLog("\n>>> Step 2: Restoring original files...");
+            SetStatus("Restoring files...");
+            int restored = 0, removed = 0, failed = 0;
+            var created = UnzipBaselineStore.LoadCreated();
+
+            await Task.Run(() =>
+            {
+                // 1) Put back the captured originals (overwrite current).
+                foreach (var baselineFile in UnzipBaselineStore.EnumerateBaselineFiles())
+                {
+                    var orig = UnzipBaselineStore.DecodeOriginalPath(baselineFile);
+                    if (string.IsNullOrEmpty(orig))
+                    {
+                        AppendLog($"  ⚠ Cannot map baseline file: {baselineFile}");
+                        continue;
+                    }
+                    try
+                    {
+                        var dir = Path.GetDirectoryName(orig);
+                        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                        if (File.Exists(orig)) File.SetAttributes(orig, FileAttributes.Normal);
+                        File.Copy(baselineFile, orig, overwrite: true);
+                        restored++;
+                        AppendLog($"  ↩ {orig}");
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        AppendLog($"  ✘ {orig}: {ex.Message}");
+                    }
+                }
+
+                // 2) Delete files that deploys created (did not exist originally).
+                foreach (var p in created)
+                {
+                    try
+                    {
+                        if (File.Exists(p))
+                        {
+                            File.SetAttributes(p, FileAttributes.Normal);
+                            File.Delete(p);
+                            removed++;
+                            AppendLog($"  🗑 {p}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        AppendLog($"  ✘ delete {p}: {ex.Message}");
+                    }
+                }
+            });
+
+            AppendLog($"\n  Restored {restored} original file(s); removed {removed} added file(s)."
+                      + (failed > 0 ? $"  ⚠ {failed} failure(s)." : ""));
+            SetStatus($"✔ Restored to original — {restored} restored, {removed} removed.");
+        }
+        finally
+        {
+            AppendLog("\n>>> Step 3: Restarting IIS...");
+            SetStatus("Restarting IIS...");
+            try
+            {
+                await IisHelper.StartIisAsync();
+                AppendLog("✔ IIS started.");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"⚠ Warning while starting IIS: {ex.Message}");
+            }
+        }
+
+        AppendLog($"\n✔ Restore completed at {DateTime.Now:HH:mm:ss}.");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -430,6 +624,7 @@ public partial class UnzipWorkbenchForm : UserControl
         AppBusyState.IsBusy = busy;
         btnRun.Enabled            = !busy && lstSqlFiles.Items.Count > 0 && _profile != null;
         btnDeploy.Enabled         = !busy && File.Exists(txtZipPath.Text.Trim());
+        btnRestoreOriginal.Enabled = !busy;
         btnBrowseZip.Enabled      = !busy;
         btnToggleSettings.Enabled = !busy;
         lstSqlFiles.Enabled       = !busy;

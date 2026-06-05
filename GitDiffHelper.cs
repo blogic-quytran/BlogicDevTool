@@ -73,7 +73,7 @@ public static class GitDiffHelper
     }
 
     public static async Task<List<string>> GetChangedFilesAsync(
-        string repoPath, string baseRef, string compareRef)
+        string repoPath, string baseRef, string compareRef, bool includeUncommitted = false)
     {
         if (!Directory.Exists(repoPath))
             throw new DirectoryNotFoundException($"Repo path not found: {repoPath}");
@@ -83,18 +83,42 @@ public static class GitDiffHelper
         if (string.IsNullOrWhiteSpace(compareRef))
             compareRef = "HEAD";
 
-        var args = $"diff --name-only --diff-filter=ACMR {baseRef}...{compareRef}";
-        var result = await RunGitAsync(repoPath, args, 60_000);
-        if (result.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"git diff failed (exit {result.ExitCode}):\n{result.Output}");
+        var files = new List<string>();
 
-        return result.Output
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => s.Trim().TrimEnd('\r'))
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .ToList();
+        if (includeUncommitted)
+        {
+            // base → working tree: committed + staged + unstaged changes to tracked files.
+            // (Two-dot/implicit form; the compare ref is intentionally ignored here.)
+            var diff = await RunGitAsync(repoPath,
+                $"diff --name-only --diff-filter=ACMR {baseRef}", 60_000);
+            if (diff.ExitCode != 0)
+                throw new InvalidOperationException(
+                    $"git diff failed (exit {diff.ExitCode}):\n{diff.Output}");
+            files.AddRange(SplitFileLines(diff.Output));
+
+            // New files that have never been added are invisible to git diff — add them too.
+            var untracked = await RunGitAsync(repoPath,
+                "ls-files --others --exclude-standard", 60_000);
+            if (untracked.ExitCode == 0)
+                files.AddRange(SplitFileLines(untracked.Output));
+        }
+        else
+        {
+            var result = await RunGitAsync(repoPath,
+                $"diff --name-only --diff-filter=ACMR {baseRef}...{compareRef}", 60_000);
+            if (result.ExitCode != 0)
+                throw new InvalidOperationException(
+                    $"git diff failed (exit {result.ExitCode}):\n{result.Output}");
+            files.AddRange(SplitFileLines(result.Output));
+        }
+
+        return files.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
+
+    private static IEnumerable<string> SplitFileLines(string output) =>
+        output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim().TrimEnd('\r'))
+            .Where(s => !string.IsNullOrWhiteSpace(s));
 
     private static Task<(int ExitCode, string Output)> RunGitAsync(
         string workingDir, string args, int timeoutMs)

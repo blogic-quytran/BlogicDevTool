@@ -18,6 +18,7 @@ public partial class BuildReleaseForm : UserControl
     private List<string> _copyExtensions = new() { ".dll", ".exe", ".pdb", ".xml", ".exe.config" };
     private string _gitBaseBranch = "dev";
     private string _gitCompareBranch = "HEAD";
+    private bool _includeUncommitted = false;
     private bool _zipAfterBuild = true;
     private bool _cleanOutputFirst = true;
     private List<BuildConfig> _configs = new();
@@ -65,6 +66,7 @@ public partial class BuildReleaseForm : UserControl
             _gitCompareBranch = settings.GitCompareBranch;
         _zipAfterBuild = settings.ZipAfterBuild;
         _cleanOutputFirst = settings.CleanOutputFirst;
+        _includeUncommitted = settings.IncludeUncommitted;
         _suppressGlobalEvents = true;
         txtGlobalOutBase.Text = _outputBasePath;
         cboConfig.SelectedItem = _configuration;
@@ -72,6 +74,7 @@ public partial class BuildReleaseForm : UserControl
         UpdateExtensionsButtonText();
         txtGitBase.Text = _gitBaseBranch;
         txtGitCompare.Text = _gitCompareBranch;
+        chkIncludeUncommitted.Checked = _includeUncommitted;
         chkZipOutput.Checked = _zipAfterBuild;
         chkCleanFirst.Checked = _cleanOutputFirst;
         _suppressGlobalEvents = false;
@@ -117,6 +120,7 @@ public partial class BuildReleaseForm : UserControl
             CopyExtensions = _copyExtensions,
             GitBaseBranch = _gitBaseBranch,
             GitCompareBranch = _gitCompareBranch,
+            IncludeUncommitted = _includeUncommitted,
             ZipAfterBuild = _zipAfterBuild,
             CleanOutputFirst = _cleanOutputFirst,
             Configs = _configs
@@ -327,6 +331,12 @@ public partial class BuildReleaseForm : UserControl
         _cleanOutputFirst = chkCleanFirst.Checked;
     }
 
+    private void chkIncludeUncommitted_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (_suppressGlobalEvents) return;
+        _includeUncommitted = chkIncludeUncommitted.Checked;
+    }
+
     private void btnGlobalBrowseOutBase_Click(object? sender, EventArgs e)
     {
         using var dlg = new FolderBrowserDialog
@@ -504,6 +514,7 @@ public partial class BuildReleaseForm : UserControl
         btnExtensions.Enabled = !_isBusy;
         txtGitBase.Enabled = !_isBusy;
         txtGitCompare.Enabled = !_isBusy;
+        chkIncludeUncommitted.Enabled = !_isBusy;
     }
 
     // ── Toolbar ──────────────────────────────────────────────────────────────
@@ -955,15 +966,17 @@ public partial class BuildReleaseForm : UserControl
         try
         {
             changed = await GitDiffHelper.GetChangedFilesAsync(
-                repoPath, _gitBaseBranch, compareRef);
+                repoPath, _gitBaseBranch, compareRef, _includeUncommitted);
         }
         catch (Exception ex)
         {
             AppendLog($"  ✘ git diff failed: {ex.Message}");
             return (null, null);
         }
-        AppendLog($"  Git diff: {changed.Count} file(s) changed " +
-                  $"({_gitBaseBranch}...{compareRef}).");
+        var diffScope = _includeUncommitted
+            ? $"{_gitBaseBranch} → working tree, incl. uncommitted"
+            : $"{_gitBaseBranch}...{compareRef}";
+        AppendLog($"  Git diff: {changed.Count} file(s) changed ({diffScope}).");
 
         var owning = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var f in changed)

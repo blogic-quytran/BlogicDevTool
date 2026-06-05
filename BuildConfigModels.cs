@@ -23,6 +23,12 @@ public class BuildSettings
     public string GitBaseBranch { get; set; } = "dev";
     public string GitCompareBranch { get; set; } = "HEAD";
 
+    /// <summary>When true, the git-diff filter compares the base ref against the
+    /// WORKING TREE (committed + staged + unstaged) and also includes new untracked
+    /// files — instead of only committed changes (base...compare). The compare ref
+    /// is ignored in this mode.</summary>
+    public bool IncludeUncommitted { get; set; } = false;
+
     /// <summary>When true, the destination output folder(s) of the configs being built
     /// (and their redistribute targets) are emptied once before the build run, so stale
     /// artifacts from previous builds don't leak into the release.</summary>

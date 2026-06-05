@@ -31,6 +31,7 @@ partial class UnzipWorkbenchForm
     private System.Windows.Forms.ListBox        lstSqlFiles;
     private System.Windows.Forms.TextBox        txtSqlPreview;
     private System.Windows.Forms.Button         btnRun;
+    private System.Windows.Forms.Button         btnRestoreOriginal;
 
     // ── Bottom deploy area ────────────────────────────────────────────────────
     private System.Windows.Forms.Panel       pnlBottom;
@@ -71,6 +72,7 @@ partial class UnzipWorkbenchForm
         lblSqlFiles = new Label();
         btnRun = new Button();
         btnDeploy = new Button();
+        btnRestoreOriginal = new Button();
         txtSqlPreview = new TextBox();
         label1 = new Label();
         pnlBottom = new Panel();
@@ -286,6 +288,7 @@ partial class UnzipWorkbenchForm
         // 
         splitMain.Panel1.Controls.Add(lstSqlFiles);
         splitMain.Panel1.Controls.Add(lblSqlFiles);
+        splitMain.Panel1.Controls.Add(btnRestoreOriginal);
         splitMain.Panel1.Controls.Add(btnRun);
         splitMain.Panel1.Controls.Add(btnDeploy);
         // 
@@ -351,9 +354,24 @@ partial class UnzipWorkbenchForm
         btnDeploy.Text = "🚀 Deploy";
         btnDeploy.UseVisualStyleBackColor = false;
         btnDeploy.Click += btnDeploy_Click;
-        // 
+        //
+        // btnRestoreOriginal
+        //
+        btnRestoreOriginal.BackColor = Color.FromArgb(120, 90, 30);
+        btnRestoreOriginal.Dock = DockStyle.Bottom;
+        btnRestoreOriginal.FlatStyle = FlatStyle.Flat;
+        btnRestoreOriginal.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        btnRestoreOriginal.ForeColor = Color.White;
+        btnRestoreOriginal.Location = new Point(0, 340);
+        btnRestoreOriginal.Name = "btnRestoreOriginal";
+        btnRestoreOriginal.Size = new Size(226, 30);
+        btnRestoreOriginal.TabIndex = 0;
+        btnRestoreOriginal.Text = "↩ Restore Original";
+        btnRestoreOriginal.UseVisualStyleBackColor = false;
+        btnRestoreOriginal.Click += btnRestoreOriginal_Click;
+        //
         // txtSqlPreview
-        // 
+        //
         txtSqlPreview.BackColor = Color.FromArgb(30, 30, 30);
         txtSqlPreview.Dock = DockStyle.Fill;
         txtSqlPreview.Font = new Font("Consolas", 9F);
