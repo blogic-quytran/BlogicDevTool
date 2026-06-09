@@ -71,6 +71,8 @@ partial class BuildReleaseForm
         lblGlobalOutBase = new Label();
         txtGlobalOutBase = new TextBox();
         btnGlobalBrowseOutBase = new Button();
+        lblConfig = new Label();
+        cboConfig = new ComboBox();
         lblExtensions = new Label();
         btnExtensions = new Button();
         lblGitBase = new Label();
@@ -88,8 +90,6 @@ partial class BuildReleaseForm
         lblSln = new Label();
         txtSln = new TextBox();
         btnBrowseSln = new Button();
-        lblConfig = new Label();
-        cboConfig = new ComboBox();
         lblEngine = new Label();
         cboEngine = new ComboBox();
         lblOutFolder = new Label();
@@ -103,13 +103,13 @@ partial class BuildReleaseForm
         lblFilterInfo = new Label();
         btnSaveConfig = new Button();
         pnlActions = new Panel();
+        progressBar = new ProgressBar();
         btnPreview = new Button();
         btnBuildChecked = new Button();
         btnBuildAll = new Button();
         chkCleanFirst = new CheckBox();
         chkZipOutput = new CheckBox();
         lblStatus = new Label();
-        progressBar = new ProgressBar();
         txtLog = new TextBox();
         pnlGlobal.SuspendLayout();
         pnlList.SuspendLayout();
@@ -171,9 +171,9 @@ partial class BuildReleaseForm
         txtGlobalOutBase.Size = new Size(430, 23);
         txtGlobalOutBase.TabIndex = 1;
         txtGlobalOutBase.TextChanged += txtGlobalOutBase_TextChanged;
-        //
+        // 
         // btnGlobalBrowseOutBase
-        //
+        // 
         btnGlobalBrowseOutBase.Location = new Point(575, 2);
         btnGlobalBrowseOutBase.Name = "btnGlobalBrowseOutBase";
         btnGlobalBrowseOutBase.Size = new Size(66, 26);
@@ -181,6 +181,25 @@ partial class BuildReleaseForm
         btnGlobalBrowseOutBase.Text = "Browse";
         btnGlobalBrowseOutBase.UseVisualStyleBackColor = true;
         btnGlobalBrowseOutBase.Click += btnGlobalBrowseOutBase_Click;
+        // 
+        // lblConfig
+        // 
+        lblConfig.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        lblConfig.Location = new Point(648, 6);
+        lblConfig.Name = "lblConfig";
+        lblConfig.Size = new Size(52, 20);
+        lblConfig.TabIndex = 9;
+        lblConfig.Text = "Config:";
+        lblConfig.TextAlign = ContentAlignment.MiddleLeft;
+        // 
+        // cboConfig
+        // 
+        cboConfig.DropDownStyle = ComboBoxStyle.DropDownList;
+        cboConfig.Location = new Point(702, 4);
+        cboConfig.Name = "cboConfig";
+        cboConfig.Size = new Size(150, 23);
+        cboConfig.TabIndex = 10;
+        cboConfig.SelectedIndexChanged += cboConfig_SelectedIndexChanged;
         // 
         // lblExtensions
         // 
@@ -223,20 +242,20 @@ partial class BuildReleaseForm
         lblGitCompare.TabIndex = 7;
         lblGitCompare.Text = "Git Compare:";
         lblGitCompare.TextAlign = ContentAlignment.MiddleLeft;
-        //
+        // 
         // chkIncludeUncommitted
-        //
+        // 
         chkIncludeUncommitted.AutoSize = true;
         chkIncludeUncommitted.Location = new Point(141, 64);
         chkIncludeUncommitted.Name = "chkIncludeUncommitted";
-        chkIncludeUncommitted.Size = new Size(360, 19);
+        chkIncludeUncommitted.Size = new Size(381, 19);
         chkIncludeUncommitted.TabIndex = 9;
         chkIncludeUncommitted.Text = "Include uncommitted changes (staged + working tree + untracked)";
         chkIncludeUncommitted.UseVisualStyleBackColor = true;
         chkIncludeUncommitted.CheckedChanged += chkIncludeUncommitted_CheckedChanged;
-        //
+        // 
         // pnlList
-        //
+        // 
         pnlList.BorderStyle = BorderStyle.FixedSingle;
         pnlList.Controls.Add(btnAdd);
         pnlList.Controls.Add(btnDelete);
@@ -373,25 +392,6 @@ partial class BuildReleaseForm
         btnBrowseSln.UseVisualStyleBackColor = true;
         btnBrowseSln.Click += btnBrowseSln_Click;
         // 
-        // lblConfig
-        // 
-        lblConfig.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        lblConfig.Location = new Point(648, 6);
-        lblConfig.Name = "lblConfig";
-        lblConfig.Size = new Size(52, 20);
-        lblConfig.TabIndex = 9;
-        lblConfig.Text = "Config:";
-        lblConfig.TextAlign = ContentAlignment.MiddleLeft;
-        //
-        // cboConfig
-        //
-        cboConfig.DropDownStyle = ComboBoxStyle.DropDownList;
-        cboConfig.Location = new Point(702, 4);
-        cboConfig.Name = "cboConfig";
-        cboConfig.Size = new Size(150, 23);
-        cboConfig.TabIndex = 10;
-        cboConfig.SelectedIndexChanged += cboConfig_SelectedIndexChanged;
-        // 
         // lblEngine
         // 
         lblEngine.Location = new Point(8, 72);
@@ -400,9 +400,9 @@ partial class BuildReleaseForm
         lblEngine.TabIndex = 7;
         lblEngine.Text = "Engine:";
         lblEngine.TextAlign = ContentAlignment.MiddleLeft;
-        //
+        // 
         // cboEngine
-        //
+        // 
         cboEngine.DropDownStyle = ComboBoxStyle.DropDownList;
         cboEngine.Location = new Point(108, 70);
         cboEngine.Name = "cboEngine";
@@ -526,6 +526,14 @@ partial class BuildReleaseForm
         pnlActions.Size = new Size(864, 44);
         pnlActions.TabIndex = 3;
         // 
+        // progressBar
+        // 
+        progressBar.Location = new Point(753, 10);
+        progressBar.Name = "progressBar";
+        progressBar.Size = new Size(111, 24);
+        progressBar.TabIndex = 6;
+        progressBar.Visible = false;
+        // 
         // btnPreview
         // 
         btnPreview.Location = new Point(0, 6);
@@ -565,45 +573,37 @@ partial class BuildReleaseForm
         btnBuildAll.Text = "Build All";
         btnBuildAll.UseVisualStyleBackColor = false;
         btnBuildAll.Click += btnBuildAll_Click;
-        //
+        // 
         // chkCleanFirst
-        //
+        // 
         chkCleanFirst.AutoSize = true;
         chkCleanFirst.Location = new Point(556, 4);
         chkCleanFirst.Name = "chkCleanFirst";
-        chkCleanFirst.Size = new Size(95, 19);
+        chkCleanFirst.Size = new Size(79, 19);
         chkCleanFirst.TabIndex = 3;
         chkCleanFirst.Text = "Clean first";
         chkCleanFirst.UseVisualStyleBackColor = true;
         chkCleanFirst.CheckedChanged += chkCleanFirst_CheckedChanged;
-        //
+        // 
         // chkZipOutput
-        //
+        // 
         chkZipOutput.AutoSize = true;
         chkZipOutput.Location = new Point(556, 24);
         chkZipOutput.Name = "chkZipOutput";
-        chkZipOutput.Size = new Size(95, 19);
+        chkZipOutput.Size = new Size(82, 19);
         chkZipOutput.TabIndex = 4;
         chkZipOutput.Text = "Zip output";
         chkZipOutput.UseVisualStyleBackColor = true;
         chkZipOutput.CheckedChanged += chkZipOutput_CheckedChanged;
-        //
+        // 
         // lblStatus
-        //
+        // 
         lblStatus.AutoEllipsis = true;
         lblStatus.ForeColor = Color.DarkGray;
         lblStatus.Location = new Point(660, 14);
         lblStatus.Name = "lblStatus";
         lblStatus.Size = new Size(90, 18);
         lblStatus.TabIndex = 5;
-        //
-        // progressBar
-        //
-        progressBar.Location = new Point(753, 10);
-        progressBar.Name = "progressBar";
-        progressBar.Size = new Size(111, 24);
-        progressBar.TabIndex = 6;
-        progressBar.Visible = false;
         // 
         // txtLog
         // 
@@ -615,7 +615,7 @@ partial class BuildReleaseForm
         txtLog.Name = "txtLog";
         txtLog.ReadOnly = true;
         txtLog.ScrollBars = ScrollBars.Both;
-        txtLog.Size = new Size(864, 218);
+        txtLog.Size = new Size(864, 173);
         txtLog.TabIndex = 4;
         txtLog.WordWrap = false;
         // 
@@ -629,13 +629,14 @@ partial class BuildReleaseForm
         Controls.Add(pnlActions);
         Controls.Add(txtLog);
         Name = "BuildReleaseForm";
-        Size = new Size(880, 720);
+        Size = new Size(880, 675);
         pnlGlobal.ResumeLayout(false);
         pnlGlobal.PerformLayout();
         pnlList.ResumeLayout(false);
         pnlDetail.ResumeLayout(false);
         pnlDetail.PerformLayout();
         pnlActions.ResumeLayout(false);
+        pnlActions.PerformLayout();
         ResumeLayout(false);
         PerformLayout();
     }

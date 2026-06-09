@@ -322,7 +322,7 @@ partial class UnzipWorkbenchForm
         lblSqlFiles.Padding = new Padding(4, 0, 0, 0);
         lblSqlFiles.Size = new Size(226, 22);
         lblSqlFiles.TabIndex = 1;
-        lblSqlFiles.Text = "SQL Scripts:";
+        lblSqlFiles.Text = "SQL / EXE files:";
         lblSqlFiles.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // btnRun

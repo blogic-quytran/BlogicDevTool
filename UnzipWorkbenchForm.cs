@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.IO.Compression;
+using System.Text;
 
 namespace BLogicDevTool;
 
@@ -191,17 +193,22 @@ public partial class UnzipWorkbenchForm : UserControl
         {
             using var archive = ZipFile.OpenRead(zipPath);
             foreach (var entry in archive.Entries
-                .Where(e => e.Name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
+                .Where(e => e.Name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)
+                         || e.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(e => e.FullName))
             {
-                using var reader = new StreamReader(entry.Open());
-                _sqlContents[entry.FullName] = reader.ReadToEnd();
+                // .sql: read text for preview/run. .exe: list only (run extracts & executes).
+                if (entry.Name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var reader = new StreamReader(entry.Open());
+                    _sqlContents[entry.FullName] = reader.ReadToEnd();
+                }
                 lstSqlFiles.Items.Add(entry.FullName);
             }
 
             SetStatus(lstSqlFiles.Items.Count == 0
-                ? "⚠ No .sql files found in the ZIP."
-                : $"✔ Loaded {lstSqlFiles.Items.Count} .sql file(s).");
+                ? "⚠ No .sql or .exe files found in the ZIP."
+                : $"✔ Loaded {lstSqlFiles.Items.Count} runnable file(s) (.sql / .exe).");
         }
         catch (Exception ex)
         {
@@ -211,10 +218,28 @@ public partial class UnzipWorkbenchForm : UserControl
         UpdateButtonStates();
     }
 
+    private static bool IsExe(string name) =>
+        name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
+
     private void lstSqlFiles_SelectedIndexChanged(object sender, EventArgs e)
     {
         if (lstSqlFiles.SelectedItem is not string key) return;
-        txtSqlPreview.Text = _sqlContents.TryGetValue(key, out var content) ? content : "";
+
+        if (IsExe(key))
+        {
+            txtSqlPreview.ReadOnly = true;
+            txtSqlPreview.Text =
+                $"[Executable]{Environment.NewLine}{key}{Environment.NewLine}{Environment.NewLine}" +
+                "Click \"▶ Run EXE\" to extract this file (with the files in its folder) to a temp " +
+                "directory and run it.";
+            btnRun.Text = "▶ Run EXE";
+        }
+        else
+        {
+            txtSqlPreview.ReadOnly = false;
+            txtSqlPreview.Text = _sqlContents.TryGetValue(key, out var content) ? content : "";
+            btnRun.Text = "▶ Run SQL";
+        }
         txtSqlPreview.SelectionStart = 0;
         txtSqlPreview.ScrollToCaret();
     }
@@ -223,16 +248,22 @@ public partial class UnzipWorkbenchForm : UserControl
 
     private async void btnRun_Click(object sender, EventArgs e)
     {
-        if (_profile == null)
+        if (lstSqlFiles.SelectedItem is not string key)
         {
-            MessageBox.Show("No SQL connection — open this tool from the menu with an active login session.", "Run SQL",
+            MessageBox.Show("Please select a .sql or .exe file from the list.", "Run",
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
-        if (lstSqlFiles.SelectedItem is not string key)
+        if (IsExe(key))
         {
-            MessageBox.Show("Please select a .sql file from the list.", "Run SQL",
+            await RunExeFromZipAsync(key);
+            return;
+        }
+
+        if (_profile == null)
+        {
+            MessageBox.Show("No SQL connection — open this tool from the menu with an active login session.", "Run SQL",
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
@@ -280,6 +311,129 @@ public partial class UnzipWorkbenchForm : UserControl
         {
             SetBusy(false);
         }
+    }
+
+    // ── Run EXE ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Extracts the selected .exe — together with the other files in its folder inside
+    /// the ZIP (so its dependencies come along) — into a temp directory, runs it, logs
+    /// the output and exit code, then cleans up.
+    /// </summary>
+    private async Task RunExeFromZipAsync(string entryFullName)
+    {
+        var zipPath = txtZipPath.Text.Trim();
+        if (!File.Exists(zipPath))
+        {
+            MessageBox.Show("Please select a valid ZIP file.", "Run EXE",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        if (MessageBox.Show(
+                $"Run this executable?\n\n{entryFullName}\n\n" +
+                "It will be extracted (with the files in its folder) to a temp directory and run.",
+                "Confirm Run EXE", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            return;
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"BLogicDevTool_run_{Guid.NewGuid():N}");
+        SetBusy(true, $"Running '{Path.GetFileName(entryFullName)}'...");
+        AppendLog($"\n>>> EXE: {entryFullName}  at {DateTime.Now:HH:mm:ss}");
+        try
+        {
+            // Folder prefix of the exe inside the ZIP ("" if it sits at the root).
+            int slash = entryFullName.LastIndexOf('/');
+            var dirPrefix = slash >= 0 ? entryFullName.Substring(0, slash + 1) : "";
+            string exePath = "";
+
+            await Task.Run(() =>
+            {
+                using var archive = ZipFile.OpenRead(zipPath);
+                foreach (var entry in archive.Entries)
+                {
+                    if (string.IsNullOrEmpty(entry.Name)) continue;
+                    if (!entry.FullName.StartsWith(dirPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+
+                    var rel = entry.FullName.Substring(dirPrefix.Length)
+                                   .Replace('/', Path.DirectorySeparatorChar);
+                    var outPath = Path.Combine(tempDir, rel);
+                    var outDir = Path.GetDirectoryName(outPath);
+                    if (!string.IsNullOrEmpty(outDir)) Directory.CreateDirectory(outDir);
+                    entry.ExtractToFile(outPath, overwrite: true);
+                    if (entry.FullName.Equals(entryFullName, StringComparison.OrdinalIgnoreCase))
+                        exePath = outPath;
+                }
+            });
+
+            if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+            {
+                AppendLog("✘ Could not extract the executable from the ZIP.");
+                SetStatus("✘ Run failed.");
+                return;
+            }
+            AppendLog($"  Extracted to: {tempDir}");
+
+            var (exit, output) = await RunExternalProcessAsync(exePath, Path.GetDirectoryName(exePath)!);
+            if (!string.IsNullOrWhiteSpace(output)) AppendLog(output.TrimEnd());
+            if (exit == 0)
+            {
+                AppendLog("✔ Exited with code 0.");
+                SetStatus($"✔ Ran: {Path.GetFileName(entryFullName)}");
+            }
+            else
+            {
+                AppendLog($"⚠ Exited with code {exit}.");
+                SetStatus($"⚠ Exit {exit}: {Path.GetFileName(entryFullName)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"✘ EXE error: {ex.Message}");
+            SetStatus("✘ Run failed.");
+        }
+        finally
+        {
+            SetBusy(false);
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, recursive: true); }
+            catch { /* best-effort cleanup */ }
+        }
+    }
+
+    private static Task<(int ExitCode, string Output)> RunExternalProcessAsync(
+        string exePath, string workingDir)
+    {
+        return Task.Run(() =>
+        {
+            var psi = new ProcessStartInfo(exePath)
+            {
+                WorkingDirectory = workingDir,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            using var proc = Process.Start(psi)
+                ?? throw new InvalidOperationException("Cannot start the executable.");
+
+            var sb = new StringBuilder();
+            var sync = new object();
+            void Capture(string? line) { if (line != null) lock (sync) sb.AppendLine(line); }
+            proc.OutputDataReceived += (_, e) => Capture(e.Data);
+            proc.ErrorDataReceived  += (_, e) => Capture(e.Data);
+            proc.BeginOutputReadLine();
+            proc.BeginErrorReadLine();
+
+            if (!proc.WaitForExit(1_800_000))
+            {
+                try { proc.Kill(entireProcessTree: true); } catch { }
+                throw new TimeoutException("Executable timed out after 30 minutes.");
+            }
+            proc.WaitForExit();
+
+            string output;
+            lock (sync) output = sb.ToString();
+            return (proc.ExitCode, output);
+        });
     }
 
     // ── Deploy ────────────────────────────────────────────────────────────────
@@ -613,14 +767,16 @@ public partial class UnzipWorkbenchForm : UserControl
     {
         var zipExists = File.Exists(txtZipPath.Text.Trim());
         btnDeploy.Enabled = zipExists;
-        btnRun.Enabled    = zipExists && lstSqlFiles.Items.Count > 0 && _profile != null;
+        // Run is enabled whenever there are runnable files; the SQL path checks the
+        // DB connection itself, the EXE path doesn't need one.
+        btnRun.Enabled    = zipExists && lstSqlFiles.Items.Count > 0;
     }
 
     private void SetBusy(bool busy, string? statusText = null)
     {
         if (InvokeRequired) { Invoke(() => SetBusy(busy, statusText)); return; }
         AppBusyState.IsBusy = busy;
-        btnRun.Enabled            = !busy && lstSqlFiles.Items.Count > 0 && _profile != null;
+        btnRun.Enabled            = !busy && lstSqlFiles.Items.Count > 0;
         btnDeploy.Enabled         = !busy && File.Exists(txtZipPath.Text.Trim());
         btnRestoreOriginal.Enabled = !busy;
         btnBrowseZip.Enabled      = !busy;
