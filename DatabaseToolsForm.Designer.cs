@@ -67,19 +67,6 @@ partial class DatabaseToolsForm
     {
         lblConnStatus = new Label();
         tabControl = new TabControl();
-        tabBackup = new TabPage();
-        grpBackupInfo = new GroupBox();
-        lblDbNameB = new Label();
-        cboDbNameB = new ComboBox();
-        btnLoginB = new Button();
-        lblBackupDir = new Label();
-        txtBackupDir = new TextBox();
-        btnBrowseDir = new Button();
-        grpSqlPreviewB = new GroupBox();
-        txtSqlPreviewB = new TextBox();
-        lblBackupStatus = new Label();
-        pbBackup = new ProgressBar();
-        btnExecuteBackup = new Button();
         tabRestoreZip = new TabPage();
         grpZipFile = new GroupBox();
         lblZipPath = new Label();
@@ -110,16 +97,29 @@ partial class DatabaseToolsForm
         lblZipRestoreStatus = new Label();
         pbRestore = new ProgressBar();
         btnExecuteRestoreFromZip = new Button();
+        tabBackup = new TabPage();
+        grpBackupInfo = new GroupBox();
+        lblDbNameB = new Label();
+        cboDbNameB = new ComboBox();
+        btnLoginB = new Button();
+        lblBackupDir = new Label();
+        txtBackupDir = new TextBox();
+        btnBrowseDir = new Button();
+        grpSqlPreviewB = new GroupBox();
+        txtSqlPreviewB = new TextBox();
+        lblBackupStatus = new Label();
+        pbBackup = new ProgressBar();
+        btnExecuteBackup = new Button();
         tabControl.SuspendLayout();
-        tabBackup.SuspendLayout();
-        grpBackupInfo.SuspendLayout();
-        grpSqlPreviewB.SuspendLayout();
         tabRestoreZip.SuspendLayout();
         grpZipFile.SuspendLayout();
         grpBakList.SuspendLayout();
         grpBakDirect.SuspendLayout();
         grpZipRestoreInfo.SuspendLayout();
         grpSqlPreviewZ.SuspendLayout();
+        tabBackup.SuspendLayout();
+        grpBackupInfo.SuspendLayout();
+        grpSqlPreviewB.SuspendLayout();
         SuspendLayout();
         // 
         // lblConnStatus
@@ -144,163 +144,6 @@ partial class DatabaseToolsForm
         tabControl.SelectedIndex = 0;
         tabControl.Size = new Size(880, 635);
         tabControl.TabIndex = 0;
-        // 
-        // tabBackup
-        // 
-        tabBackup.Controls.Add(grpBackupInfo);
-        tabBackup.Controls.Add(grpSqlPreviewB);
-        tabBackup.Controls.Add(lblBackupStatus);
-        tabBackup.Controls.Add(pbBackup);
-        tabBackup.Controls.Add(btnExecuteBackup);
-        tabBackup.Font = new Font("Segoe UI", 9F);
-        tabBackup.Location = new Point(4, 26);
-        tabBackup.Name = "tabBackup";
-        tabBackup.Padding = new Padding(3);
-        tabBackup.Size = new Size(872, 605);
-        tabBackup.TabIndex = 1;
-        tabBackup.Text = "💾 Backup DB";
-        tabBackup.UseVisualStyleBackColor = true;
-        // 
-        // grpBackupInfo
-        // 
-        grpBackupInfo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        grpBackupInfo.Controls.Add(lblDbNameB);
-        grpBackupInfo.Controls.Add(cboDbNameB);
-        grpBackupInfo.Controls.Add(btnLoginB);
-        grpBackupInfo.Controls.Add(lblBackupDir);
-        grpBackupInfo.Controls.Add(txtBackupDir);
-        grpBackupInfo.Controls.Add(btnBrowseDir);
-        grpBackupInfo.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        grpBackupInfo.Location = new Point(8, 6);
-        grpBackupInfo.Name = "grpBackupInfo";
-        grpBackupInfo.Size = new Size(856, 100);
-        grpBackupInfo.TabIndex = 0;
-        grpBackupInfo.TabStop = false;
-        grpBackupInfo.Text = "Backup Info";
-        // 
-        // lblDbNameB
-        // 
-        lblDbNameB.AutoSize = true;
-        lblDbNameB.Font = new Font("Segoe UI", 9F);
-        lblDbNameB.Location = new Point(10, 30);
-        lblDbNameB.Name = "lblDbNameB";
-        lblDbNameB.Size = new Size(58, 15);
-        lblDbNameB.TabIndex = 0;
-        lblDbNameB.Text = "Database:";
-        // 
-        // cboDbNameB
-        // 
-        cboDbNameB.Font = new Font("Segoe UI", 9F);
-        cboDbNameB.Location = new Point(122, 27);
-        cboDbNameB.Name = "cboDbNameB";
-        cboDbNameB.Size = new Size(622, 23);
-        cboDbNameB.TabIndex = 0;
-        cboDbNameB.TextChanged += cboDbNameB_TextChanged;
-        // 
-        // btnLoginB
-        // 
-        btnLoginB.Font = new Font("Segoe UI", 9F);
-        btnLoginB.Location = new Point(751, 27);
-        btnLoginB.Name = "btnLoginB";
-        btnLoginB.Size = new Size(93, 26);
-        btnLoginB.TabIndex = 1;
-        btnLoginB.Text = "🔑 Login";
-        btnLoginB.UseVisualStyleBackColor = true;
-        btnLoginB.Click += btnLogin_Click;
-        // 
-        // lblBackupDir
-        // 
-        lblBackupDir.AutoSize = true;
-        lblBackupDir.Font = new Font("Segoe UI", 9F);
-        lblBackupDir.Location = new Point(10, 65);
-        lblBackupDir.Name = "lblBackupDir";
-        lblBackupDir.Size = new Size(83, 15);
-        lblBackupDir.TabIndex = 1;
-        lblBackupDir.Text = "Backup folder:";
-        // 
-        // txtBackupDir
-        // 
-        txtBackupDir.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-        txtBackupDir.Font = new Font("Segoe UI", 9F);
-        txtBackupDir.Location = new Point(122, 62);
-        txtBackupDir.Name = "txtBackupDir";
-        txtBackupDir.Size = new Size(622, 23);
-        txtBackupDir.TabIndex = 1;
-        txtBackupDir.TextChanged += txtBackupDir_TextChanged;
-        // 
-        // btnBrowseDir
-        // 
-        btnBrowseDir.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        btnBrowseDir.Font = new Font("Segoe UI", 9F);
-        btnBrowseDir.Location = new Point(751, 61);
-        btnBrowseDir.Name = "btnBrowseDir";
-        btnBrowseDir.Size = new Size(93, 26);
-        btnBrowseDir.TabIndex = 2;
-        btnBrowseDir.Text = "Select folder...";
-        btnBrowseDir.UseVisualStyleBackColor = true;
-        btnBrowseDir.Click += btnBrowseDir_Click;
-        // 
-        // grpSqlPreviewB
-        // 
-        grpSqlPreviewB.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-        grpSqlPreviewB.Controls.Add(txtSqlPreviewB);
-        grpSqlPreviewB.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        grpSqlPreviewB.Location = new Point(8, 114);
-        grpSqlPreviewB.Name = "grpSqlPreviewB";
-        grpSqlPreviewB.Size = new Size(856, 443);
-        grpSqlPreviewB.TabIndex = 1;
-        grpSqlPreviewB.TabStop = false;
-        grpSqlPreviewB.Text = "SQL Preview";
-        // 
-        // txtSqlPreviewB
-        // 
-        txtSqlPreviewB.BackColor = Color.FromArgb(30, 30, 30);
-        txtSqlPreviewB.Dock = DockStyle.Fill;
-        txtSqlPreviewB.Font = new Font("Consolas", 9F);
-        txtSqlPreviewB.ForeColor = Color.LightGreen;
-        txtSqlPreviewB.Location = new Point(3, 19);
-        txtSqlPreviewB.Multiline = true;
-        txtSqlPreviewB.Name = "txtSqlPreviewB";
-        txtSqlPreviewB.ScrollBars = ScrollBars.Vertical;
-        txtSqlPreviewB.Size = new Size(850, 421);
-        txtSqlPreviewB.TabIndex = 0;
-        // 
-        // lblBackupStatus
-        // 
-        lblBackupStatus.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        lblBackupStatus.Font = new Font("Segoe UI", 9F);
-        lblBackupStatus.ForeColor = Color.DarkGray;
-        lblBackupStatus.Location = new Point(11, 563);
-        lblBackupStatus.Name = "lblBackupStatus";
-        lblBackupStatus.Size = new Size(640, 22);
-        lblBackupStatus.TabIndex = 2;
-        lblBackupStatus.Text = "Ready.";
-        //
-        // pbBackup
-        //
-        pbBackup.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-        pbBackup.Location = new Point(11, 588);
-        pbBackup.MarqueeAnimationSpeed = 30;
-        pbBackup.Name = "pbBackup";
-        pbBackup.Size = new Size(747, 8);
-        pbBackup.Style = ProgressBarStyle.Marquee;
-        pbBackup.TabIndex = 3;
-        pbBackup.Visible = false;
-        //
-        // btnExecuteBackup
-        // 
-        btnExecuteBackup.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        btnExecuteBackup.BackColor = Color.FromArgb(0, 90, 180);
-        btnExecuteBackup.FlatStyle = FlatStyle.Flat;
-        btnExecuteBackup.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-        btnExecuteBackup.ForeColor = Color.White;
-        btnExecuteBackup.Location = new Point(764, 567);
-        btnExecuteBackup.Name = "btnExecuteBackup";
-        btnExecuteBackup.Size = new Size(100, 32);
-        btnExecuteBackup.TabIndex = 2;
-        btnExecuteBackup.Text = "▶ Backup";
-        btnExecuteBackup.UseVisualStyleBackColor = false;
-        btnExecuteBackup.Click += btnExecuteBackup_Click;
         // 
         // tabRestoreZip
         // 
@@ -489,6 +332,7 @@ partial class DatabaseToolsForm
         // 
         // cboDbNameZ
         // 
+        cboDbNameZ.Anchor = AnchorStyles.Left | AnchorStyles.Right;
         cboDbNameZ.Font = new Font("Segoe UI", 9F);
         cboDbNameZ.Location = new Point(110, 27);
         cboDbNameZ.Name = "cboDbNameZ";
@@ -498,6 +342,7 @@ partial class DatabaseToolsForm
         // 
         // btnLoginZ
         // 
+        btnLoginZ.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         btnLoginZ.Font = new Font("Segoe UI", 9F);
         btnLoginZ.Location = new Point(755, 25);
         btnLoginZ.Name = "btnLoginZ";
@@ -621,9 +466,9 @@ partial class DatabaseToolsForm
         lblZipRestoreStatus.Size = new Size(640, 22);
         lblZipRestoreStatus.TabIndex = 4;
         lblZipRestoreStatus.Text = "Ready.";
-        //
+        // 
         // pbRestore
-        //
+        // 
         pbRestore.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         pbRestore.Location = new Point(8, 585);
         pbRestore.MarqueeAnimationSpeed = 30;
@@ -632,7 +477,7 @@ partial class DatabaseToolsForm
         pbRestore.Style = ProgressBarStyle.Marquee;
         pbRestore.TabIndex = 6;
         pbRestore.Visible = false;
-        //
+        // 
         // btnExecuteRestoreFromZip
         // 
         btnExecuteRestoreFromZip.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
@@ -648,6 +493,165 @@ partial class DatabaseToolsForm
         btnExecuteRestoreFromZip.UseVisualStyleBackColor = false;
         btnExecuteRestoreFromZip.Click += btnExecuteRestoreFromZip_Click;
         // 
+        // tabBackup
+        // 
+        tabBackup.Controls.Add(grpBackupInfo);
+        tabBackup.Controls.Add(grpSqlPreviewB);
+        tabBackup.Controls.Add(lblBackupStatus);
+        tabBackup.Controls.Add(pbBackup);
+        tabBackup.Controls.Add(btnExecuteBackup);
+        tabBackup.Font = new Font("Segoe UI", 9F);
+        tabBackup.Location = new Point(4, 26);
+        tabBackup.Name = "tabBackup";
+        tabBackup.Padding = new Padding(3);
+        tabBackup.Size = new Size(872, 605);
+        tabBackup.TabIndex = 1;
+        tabBackup.Text = "💾 Backup DB";
+        tabBackup.UseVisualStyleBackColor = true;
+        // 
+        // grpBackupInfo
+        // 
+        grpBackupInfo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        grpBackupInfo.Controls.Add(lblDbNameB);
+        grpBackupInfo.Controls.Add(cboDbNameB);
+        grpBackupInfo.Controls.Add(btnLoginB);
+        grpBackupInfo.Controls.Add(lblBackupDir);
+        grpBackupInfo.Controls.Add(txtBackupDir);
+        grpBackupInfo.Controls.Add(btnBrowseDir);
+        grpBackupInfo.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        grpBackupInfo.Location = new Point(8, 6);
+        grpBackupInfo.Name = "grpBackupInfo";
+        grpBackupInfo.Size = new Size(856, 100);
+        grpBackupInfo.TabIndex = 0;
+        grpBackupInfo.TabStop = false;
+        grpBackupInfo.Text = "Backup Info";
+        // 
+        // lblDbNameB
+        // 
+        lblDbNameB.AutoSize = true;
+        lblDbNameB.Font = new Font("Segoe UI", 9F);
+        lblDbNameB.Location = new Point(10, 30);
+        lblDbNameB.Name = "lblDbNameB";
+        lblDbNameB.Size = new Size(58, 15);
+        lblDbNameB.TabIndex = 0;
+        lblDbNameB.Text = "Database:";
+        // 
+        // cboDbNameB
+        // 
+        cboDbNameB.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        cboDbNameB.Font = new Font("Segoe UI", 9F);
+        cboDbNameB.Location = new Point(122, 27);
+        cboDbNameB.Name = "cboDbNameB";
+        cboDbNameB.Size = new Size(622, 23);
+        cboDbNameB.TabIndex = 0;
+        cboDbNameB.TextChanged += cboDbNameB_TextChanged;
+        // 
+        // btnLoginB
+        // 
+        btnLoginB.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnLoginB.Font = new Font("Segoe UI", 9F);
+        btnLoginB.Location = new Point(751, 27);
+        btnLoginB.Name = "btnLoginB";
+        btnLoginB.Size = new Size(93, 26);
+        btnLoginB.TabIndex = 1;
+        btnLoginB.Text = "🔑 Login";
+        btnLoginB.UseVisualStyleBackColor = true;
+        btnLoginB.Click += btnLogin_Click;
+        // 
+        // lblBackupDir
+        // 
+        lblBackupDir.AutoSize = true;
+        lblBackupDir.Font = new Font("Segoe UI", 9F);
+        lblBackupDir.Location = new Point(10, 65);
+        lblBackupDir.Name = "lblBackupDir";
+        lblBackupDir.Size = new Size(83, 15);
+        lblBackupDir.TabIndex = 1;
+        lblBackupDir.Text = "Backup folder:";
+        // 
+        // txtBackupDir
+        // 
+        txtBackupDir.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        txtBackupDir.Font = new Font("Segoe UI", 9F);
+        txtBackupDir.Location = new Point(122, 62);
+        txtBackupDir.Name = "txtBackupDir";
+        txtBackupDir.Size = new Size(622, 23);
+        txtBackupDir.TabIndex = 1;
+        txtBackupDir.TextChanged += txtBackupDir_TextChanged;
+        // 
+        // btnBrowseDir
+        // 
+        btnBrowseDir.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnBrowseDir.Font = new Font("Segoe UI", 9F);
+        btnBrowseDir.Location = new Point(751, 61);
+        btnBrowseDir.Name = "btnBrowseDir";
+        btnBrowseDir.Size = new Size(93, 26);
+        btnBrowseDir.TabIndex = 2;
+        btnBrowseDir.Text = "Select folder...";
+        btnBrowseDir.UseVisualStyleBackColor = true;
+        btnBrowseDir.Click += btnBrowseDir_Click;
+        // 
+        // grpSqlPreviewB
+        // 
+        grpSqlPreviewB.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        grpSqlPreviewB.Controls.Add(txtSqlPreviewB);
+        grpSqlPreviewB.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        grpSqlPreviewB.Location = new Point(8, 114);
+        grpSqlPreviewB.Name = "grpSqlPreviewB";
+        grpSqlPreviewB.Size = new Size(856, 443);
+        grpSqlPreviewB.TabIndex = 1;
+        grpSqlPreviewB.TabStop = false;
+        grpSqlPreviewB.Text = "SQL Preview";
+        // 
+        // txtSqlPreviewB
+        // 
+        txtSqlPreviewB.BackColor = Color.FromArgb(30, 30, 30);
+        txtSqlPreviewB.Dock = DockStyle.Fill;
+        txtSqlPreviewB.Font = new Font("Consolas", 9F);
+        txtSqlPreviewB.ForeColor = Color.LightGreen;
+        txtSqlPreviewB.Location = new Point(3, 19);
+        txtSqlPreviewB.Multiline = true;
+        txtSqlPreviewB.Name = "txtSqlPreviewB";
+        txtSqlPreviewB.ScrollBars = ScrollBars.Vertical;
+        txtSqlPreviewB.Size = new Size(850, 421);
+        txtSqlPreviewB.TabIndex = 0;
+        // 
+        // lblBackupStatus
+        // 
+        lblBackupStatus.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        lblBackupStatus.Font = new Font("Segoe UI", 9F);
+        lblBackupStatus.ForeColor = Color.DarkGray;
+        lblBackupStatus.Location = new Point(11, 563);
+        lblBackupStatus.Name = "lblBackupStatus";
+        lblBackupStatus.Size = new Size(640, 22);
+        lblBackupStatus.TabIndex = 2;
+        lblBackupStatus.Text = "Ready.";
+        // 
+        // pbBackup
+        // 
+        pbBackup.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        pbBackup.Location = new Point(11, 588);
+        pbBackup.MarqueeAnimationSpeed = 30;
+        pbBackup.Name = "pbBackup";
+        pbBackup.Size = new Size(747, 8);
+        pbBackup.Style = ProgressBarStyle.Marquee;
+        pbBackup.TabIndex = 3;
+        pbBackup.Visible = false;
+        // 
+        // btnExecuteBackup
+        // 
+        btnExecuteBackup.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+        btnExecuteBackup.BackColor = Color.FromArgb(0, 90, 180);
+        btnExecuteBackup.FlatStyle = FlatStyle.Flat;
+        btnExecuteBackup.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+        btnExecuteBackup.ForeColor = Color.White;
+        btnExecuteBackup.Location = new Point(764, 567);
+        btnExecuteBackup.Name = "btnExecuteBackup";
+        btnExecuteBackup.Size = new Size(100, 32);
+        btnExecuteBackup.TabIndex = 2;
+        btnExecuteBackup.Text = "▶ Backup";
+        btnExecuteBackup.UseVisualStyleBackColor = false;
+        btnExecuteBackup.Click += btnExecuteBackup_Click;
+        // 
         // DatabaseToolsForm
         // 
         AutoScaleDimensions = new SizeF(7F, 15F);
@@ -657,11 +661,6 @@ partial class DatabaseToolsForm
         Name = "DatabaseToolsForm";
         Size = new Size(880, 665);
         tabControl.ResumeLayout(false);
-        tabBackup.ResumeLayout(false);
-        grpBackupInfo.ResumeLayout(false);
-        grpBackupInfo.PerformLayout();
-        grpSqlPreviewB.ResumeLayout(false);
-        grpSqlPreviewB.PerformLayout();
         tabRestoreZip.ResumeLayout(false);
         grpZipFile.ResumeLayout(false);
         grpZipFile.PerformLayout();
@@ -672,6 +671,11 @@ partial class DatabaseToolsForm
         grpZipRestoreInfo.PerformLayout();
         grpSqlPreviewZ.ResumeLayout(false);
         grpSqlPreviewZ.PerformLayout();
+        tabBackup.ResumeLayout(false);
+        grpBackupInfo.ResumeLayout(false);
+        grpBackupInfo.PerformLayout();
+        grpSqlPreviewB.ResumeLayout(false);
+        grpSqlPreviewB.PerformLayout();
         ResumeLayout(false);
     }
 }

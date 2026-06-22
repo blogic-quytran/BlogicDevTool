@@ -66,13 +66,13 @@ partial class BuildReleaseForm
     private void InitializeComponent()
     {
         pnlGlobal = new Panel();
+        cboConfig = new ComboBox();
         txtGitCompare = new TextBox();
         txtGitBase = new TextBox();
         lblGlobalOutBase = new Label();
         txtGlobalOutBase = new TextBox();
         btnGlobalBrowseOutBase = new Button();
         lblConfig = new Label();
-        cboConfig = new ComboBox();
         lblExtensions = new Label();
         btnExtensions = new Button();
         lblGitBase = new Label();
@@ -121,36 +121,45 @@ partial class BuildReleaseForm
         // 
         pnlGlobal.BackColor = Color.FromArgb(245, 247, 250);
         pnlGlobal.BorderStyle = BorderStyle.FixedSingle;
+        pnlGlobal.Controls.Add(cboConfig);
         pnlGlobal.Controls.Add(txtGitCompare);
         pnlGlobal.Controls.Add(txtGitBase);
         pnlGlobal.Controls.Add(lblGlobalOutBase);
         pnlGlobal.Controls.Add(txtGlobalOutBase);
         pnlGlobal.Controls.Add(btnGlobalBrowseOutBase);
         pnlGlobal.Controls.Add(lblConfig);
-        pnlGlobal.Controls.Add(cboConfig);
-        pnlGlobal.Controls.Add(lblExtensions);
         pnlGlobal.Controls.Add(btnExtensions);
         pnlGlobal.Controls.Add(lblGitBase);
         pnlGlobal.Controls.Add(lblGitCompare);
         pnlGlobal.Controls.Add(chkIncludeUncommitted);
+        pnlGlobal.Controls.Add(lblExtensions);
         pnlGlobal.Location = new Point(8, 8);
         pnlGlobal.Name = "pnlGlobal";
-        pnlGlobal.Size = new Size(864, 88);
+        pnlGlobal.Size = new Size(864, 101);
         pnlGlobal.TabIndex = 0;
+        // 
+        // cboConfig
+        // 
+        cboConfig.DropDownStyle = ComboBoxStyle.DropDownList;
+        cboConfig.Location = new Point(755, 4);
+        cboConfig.Name = "cboConfig";
+        cboConfig.Size = new Size(102, 23);
+        cboConfig.TabIndex = 10;
+        cboConfig.SelectedIndexChanged += cboConfig_SelectedIndexChanged;
         // 
         // txtGitCompare
         // 
-        txtGitCompare.Location = new Point(662, 36);
+        txtGitCompare.Location = new Point(688, 66);
         txtGitCompare.Name = "txtGitCompare";
-        txtGitCompare.Size = new Size(196, 23);
+        txtGitCompare.Size = new Size(169, 23);
         txtGitCompare.TabIndex = 8;
         txtGitCompare.TextChanged += txtGitCompare_TextChanged;
         // 
         // txtGitBase
         // 
-        txtGitBase.Location = new Point(394, 36);
+        txtGitBase.Location = new Point(141, 33);
         txtGitBase.Name = "txtGitBase";
-        txtGitBase.Size = new Size(187, 23);
+        txtGitBase.Size = new Size(440, 23);
         txtGitBase.TabIndex = 6;
         txtGitBase.TextChanged += txtGitBase_TextChanged;
         // 
@@ -168,15 +177,15 @@ partial class BuildReleaseForm
         // 
         txtGlobalOutBase.Location = new Point(141, 4);
         txtGlobalOutBase.Name = "txtGlobalOutBase";
-        txtGlobalOutBase.Size = new Size(430, 23);
+        txtGlobalOutBase.Size = new Size(440, 23);
         txtGlobalOutBase.TabIndex = 1;
         txtGlobalOutBase.TextChanged += txtGlobalOutBase_TextChanged;
         // 
         // btnGlobalBrowseOutBase
         // 
-        btnGlobalBrowseOutBase.Location = new Point(575, 2);
+        btnGlobalBrowseOutBase.Location = new Point(587, 3);
         btnGlobalBrowseOutBase.Name = "btnGlobalBrowseOutBase";
-        btnGlobalBrowseOutBase.Size = new Size(66, 26);
+        btnGlobalBrowseOutBase.Size = new Size(99, 26);
         btnGlobalBrowseOutBase.TabIndex = 2;
         btnGlobalBrowseOutBase.Text = "Browse";
         btnGlobalBrowseOutBase.UseVisualStyleBackColor = true;
@@ -185,26 +194,17 @@ partial class BuildReleaseForm
         // lblConfig
         // 
         lblConfig.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        lblConfig.Location = new Point(648, 6);
+        lblConfig.Location = new Point(702, 5);
         lblConfig.Name = "lblConfig";
         lblConfig.Size = new Size(52, 20);
         lblConfig.TabIndex = 9;
         lblConfig.Text = "Config:";
         lblConfig.TextAlign = ContentAlignment.MiddleLeft;
         // 
-        // cboConfig
-        // 
-        cboConfig.DropDownStyle = ComboBoxStyle.DropDownList;
-        cboConfig.Location = new Point(702, 4);
-        cboConfig.Name = "cboConfig";
-        cboConfig.Size = new Size(150, 23);
-        cboConfig.TabIndex = 10;
-        cboConfig.SelectedIndexChanged += cboConfig_SelectedIndexChanged;
-        // 
         // lblExtensions
         // 
         lblExtensions.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        lblExtensions.Location = new Point(8, 38);
+        lblExtensions.Location = new Point(583, 33);
         lblExtensions.Name = "lblExtensions";
         lblExtensions.Size = new Size(112, 20);
         lblExtensions.TabIndex = 3;
@@ -213,10 +213,10 @@ partial class BuildReleaseForm
         // 
         // btnExtensions
         // 
-        btnExtensions.Location = new Point(141, 36);
+        btnExtensions.Location = new Point(688, 31);
         btnExtensions.Name = "btnExtensions";
         btnExtensions.Padding = new Padding(4, 0, 18, 0);
-        btnExtensions.Size = new Size(191, 26);
+        btnExtensions.Size = new Size(170, 26);
         btnExtensions.TabIndex = 4;
         btnExtensions.Text = "(none)";
         btnExtensions.TextAlign = ContentAlignment.MiddleLeft;
@@ -226,17 +226,17 @@ partial class BuildReleaseForm
         // lblGitBase
         // 
         lblGitBase.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        lblGitBase.Location = new Point(336, 38);
+        lblGitBase.Location = new Point(60, 33);
         lblGitBase.Name = "lblGitBase";
         lblGitBase.Size = new Size(75, 20);
         lblGitBase.TabIndex = 5;
         lblGitBase.Text = "Git Base:";
-        lblGitBase.TextAlign = ContentAlignment.MiddleLeft;
+        lblGitBase.TextAlign = ContentAlignment.MiddleRight;
         // 
         // lblGitCompare
         // 
         lblGitCompare.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        lblGitCompare.Location = new Point(584, 38);
+        lblGitCompare.Location = new Point(602, 66);
         lblGitCompare.Name = "lblGitCompare";
         lblGitCompare.Size = new Size(80, 20);
         lblGitCompare.TabIndex = 7;
@@ -246,7 +246,7 @@ partial class BuildReleaseForm
         // chkIncludeUncommitted
         // 
         chkIncludeUncommitted.AutoSize = true;
-        chkIncludeUncommitted.Location = new Point(141, 64);
+        chkIncludeUncommitted.Location = new Point(141, 69);
         chkIncludeUncommitted.Name = "chkIncludeUncommitted";
         chkIncludeUncommitted.Size = new Size(381, 19);
         chkIncludeUncommitted.TabIndex = 9;
@@ -262,9 +262,9 @@ partial class BuildReleaseForm
         pnlList.Controls.Add(btnMoveUp);
         pnlList.Controls.Add(btnMoveDown);
         pnlList.Controls.Add(clbConfigs);
-        pnlList.Location = new Point(8, 104);
+        pnlList.Location = new Point(8, 115);
         pnlList.Name = "pnlList";
-        pnlList.Size = new Size(380, 340);
+        pnlList.Size = new Size(380, 329);
         pnlList.TabIndex = 1;
         // 
         // btnAdd
@@ -316,7 +316,7 @@ partial class BuildReleaseForm
         clbConfigs.IntegralHeight = false;
         clbConfigs.Location = new Point(8, 44);
         clbConfigs.Name = "clbConfigs";
-        clbConfigs.Size = new Size(360, 286);
+        clbConfigs.Size = new Size(360, 280);
         clbConfigs.TabIndex = 4;
         clbConfigs.ItemCheck += clbConfigs_ItemCheck;
         clbConfigs.SelectedIndexChanged += clbConfigs_SelectedIndexChanged;
@@ -342,9 +342,9 @@ partial class BuildReleaseForm
         pnlDetail.Controls.Add(chkFilterGit);
         pnlDetail.Controls.Add(lblFilterInfo);
         pnlDetail.Controls.Add(btnSaveConfig);
-        pnlDetail.Location = new Point(394, 104);
+        pnlDetail.Location = new Point(394, 115);
         pnlDetail.Name = "pnlDetail";
-        pnlDetail.Size = new Size(478, 340);
+        pnlDetail.Size = new Size(478, 329);
         pnlDetail.TabIndex = 2;
         // 
         // lblName
@@ -504,7 +504,7 @@ partial class BuildReleaseForm
         btnSaveConfig.FlatStyle = FlatStyle.Flat;
         btnSaveConfig.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
         btnSaveConfig.ForeColor = Color.White;
-        btnSaveConfig.Location = new Point(108, 290);
+        btnSaveConfig.Location = new Point(108, 280);
         btnSaveConfig.Name = "btnSaveConfig";
         btnSaveConfig.Size = new Size(260, 36);
         btnSaveConfig.TabIndex = 14;
@@ -523,14 +523,14 @@ partial class BuildReleaseForm
         pnlActions.Controls.Add(lblStatus);
         pnlActions.Location = new Point(8, 448);
         pnlActions.Name = "pnlActions";
-        pnlActions.Size = new Size(864, 44);
+        pnlActions.Size = new Size(864, 57);
         pnlActions.TabIndex = 3;
         // 
         // progressBar
         // 
-        progressBar.Location = new Point(753, 10);
+        progressBar.Location = new Point(3, 45);
         progressBar.Name = "progressBar";
-        progressBar.Size = new Size(111, 24);
+        progressBar.Size = new Size(860, 5);
         progressBar.TabIndex = 6;
         progressBar.Visible = false;
         // 
@@ -602,7 +602,7 @@ partial class BuildReleaseForm
         lblStatus.ForeColor = Color.DarkGray;
         lblStatus.Location = new Point(660, 14);
         lblStatus.Name = "lblStatus";
-        lblStatus.Size = new Size(90, 18);
+        lblStatus.Size = new Size(199, 18);
         lblStatus.TabIndex = 5;
         // 
         // txtLog
@@ -610,12 +610,12 @@ partial class BuildReleaseForm
         txtLog.BackColor = Color.FromArgb(30, 30, 30);
         txtLog.Font = new Font("Consolas", 9F);
         txtLog.ForeColor = Color.LightGray;
-        txtLog.Location = new Point(8, 496);
+        txtLog.Location = new Point(8, 504);
         txtLog.Multiline = true;
         txtLog.Name = "txtLog";
         txtLog.ReadOnly = true;
         txtLog.ScrollBars = ScrollBars.Both;
-        txtLog.Size = new Size(864, 173);
+        txtLog.Size = new Size(864, 165);
         txtLog.TabIndex = 4;
         txtLog.WordWrap = false;
         // 

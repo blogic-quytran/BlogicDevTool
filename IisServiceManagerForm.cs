@@ -91,11 +91,11 @@ public partial class IisServiceManagerForm : UserControl
             // column widths
             if (dgvApps.Columns.Count > 0)
             {
-                dgvApps.Columns["Site"].Width = 160;
-                dgvApps.Columns["App"].Width = 100;
-                dgvApps.Columns["AppPoolName"].Width = 150;
+                dgvApps.Columns["Site"].Width = 100;
+                dgvApps.Columns["App"].Width = 160;
+                dgvApps.Columns["AppPoolName"].Width = 200;
                 dgvApps.Columns["PhysicalPath"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                dgvApps.Columns["Database"].Width = 200;
+                dgvApps.Columns["Database"].Width = 0;
             }
 
             SetStatus("Loaded successfully. Select a row to view details.");

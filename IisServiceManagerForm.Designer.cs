@@ -254,6 +254,7 @@ partial class IisServiceManagerForm
         // 
         // txtNewDb
         // 
+        txtNewDb.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         txtNewDb.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
         txtNewDb.AutoCompleteSource = AutoCompleteSource.ListItems;
         txtNewDb.Font = new Font("Consolas", 9.5F);
@@ -265,10 +266,11 @@ partial class IisServiceManagerForm
         // 
         // btnLoginDb
         // 
+        btnLoginDb.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         btnLoginDb.Font = new Font("Segoe UI", 9F);
-        btnLoginDb.Location = new Point(745, 26);
+        btnLoginDb.Location = new Point(745, 27);
         btnLoginDb.Name = "btnLoginDb";
-        btnLoginDb.Size = new Size(90, 26);
+        btnLoginDb.Size = new Size(90, 27);
         btnLoginDb.TabIndex = 2;
         btnLoginDb.Text = "🔑 Login";
         btnLoginDb.UseVisualStyleBackColor = true;
@@ -343,9 +345,9 @@ partial class IisServiceManagerForm
         btnChangePath.Text = "📁  Update Patch";
         btnChangePath.UseVisualStyleBackColor = false;
         btnChangePath.Click += btnChangePath_Click;
-        //
+        // 
         // btnResetPath
-        //
+        // 
         btnResetPath.BackColor = Color.FromArgb(200, 120, 40);
         btnResetPath.FlatStyle = FlatStyle.Flat;
         btnResetPath.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
@@ -357,9 +359,9 @@ partial class IisServiceManagerForm
         btnResetPath.Text = "↺  Reset Path";
         btnResetPath.UseVisualStyleBackColor = false;
         btnResetPath.Click += btnResetPath_Click;
-        //
+        // 
         // btnRestorePatch
-        //
+        // 
         btnRestorePatch.BackColor = Color.FromArgb(90, 90, 90);
         btnRestorePatch.FlatStyle = FlatStyle.Flat;
         btnRestorePatch.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);

@@ -40,7 +40,7 @@ partial class UnzipWorkbenchForm
     private System.Windows.Forms.Label       lblStatus;
     private System.Windows.Forms.ProgressBar progressBar;
     private System.Windows.Forms.GroupBox    grpLog;
-    private System.Windows.Forms.TextBox     txtLog;
+    private System.Windows.Forms.RichTextBox txtLog;
 
     protected override void Dispose(bool disposing)
     {
@@ -70,14 +70,14 @@ partial class UnzipWorkbenchForm
         splitMain = new SplitContainer();
         lstSqlFiles = new ListBox();
         lblSqlFiles = new Label();
+        btnRestoreOriginal = new Button();
         btnRun = new Button();
         btnDeploy = new Button();
-        btnRestoreOriginal = new Button();
         txtSqlPreview = new TextBox();
         label1 = new Label();
         pnlBottom = new Panel();
         grpLog = new GroupBox();
-        txtLog = new TextBox();
+        txtLog = new RichTextBox();
         pnlDeployBar = new Panel();
         progressBar = new ProgressBar();
         lblStatus = new Label();
@@ -159,6 +159,7 @@ partial class UnzipWorkbenchForm
         // 
         // cboDatabase
         // 
+        cboDatabase.Anchor = AnchorStyles.Left | AnchorStyles.Right;
         cboDatabase.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
         cboDatabase.AutoCompleteSource = AutoCompleteSource.ListItems;
         cboDatabase.Font = new Font("Consolas", 9.5F);
@@ -169,6 +170,7 @@ partial class UnzipWorkbenchForm
         // 
         // btnLoginDb
         // 
+        btnLoginDb.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         btnLoginDb.Font = new Font("Segoe UI", 9F);
         btnLoginDb.Location = new Point(581, 34);
         btnLoginDb.Name = "btnLoginDb";
@@ -309,7 +311,7 @@ partial class UnzipWorkbenchForm
         lstSqlFiles.ItemHeight = 13;
         lstSqlFiles.Location = new Point(0, 22);
         lstSqlFiles.Name = "lstSqlFiles";
-        lstSqlFiles.Size = new Size(226, 348);
+        lstSqlFiles.Size = new Size(226, 318);
         lstSqlFiles.TabIndex = 0;
         lstSqlFiles.SelectedIndexChanged += lstSqlFiles_SelectedIndexChanged;
         // 
@@ -324,6 +326,21 @@ partial class UnzipWorkbenchForm
         lblSqlFiles.TabIndex = 1;
         lblSqlFiles.Text = "SQL / EXE files:";
         lblSqlFiles.TextAlign = ContentAlignment.MiddleLeft;
+        // 
+        // btnRestoreOriginal
+        // 
+        btnRestoreOriginal.BackColor = Color.FromArgb(120, 90, 30);
+        btnRestoreOriginal.Dock = DockStyle.Bottom;
+        btnRestoreOriginal.FlatStyle = FlatStyle.Flat;
+        btnRestoreOriginal.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        btnRestoreOriginal.ForeColor = Color.White;
+        btnRestoreOriginal.Location = new Point(0, 340);
+        btnRestoreOriginal.Name = "btnRestoreOriginal";
+        btnRestoreOriginal.Size = new Size(226, 30);
+        btnRestoreOriginal.TabIndex = 0;
+        btnRestoreOriginal.Text = "↩ Rollback Task";
+        btnRestoreOriginal.UseVisualStyleBackColor = false;
+        btnRestoreOriginal.Click += btnRestoreOriginal_Click;
         // 
         // btnRun
         // 
@@ -354,24 +371,9 @@ partial class UnzipWorkbenchForm
         btnDeploy.Text = "🚀 Deploy";
         btnDeploy.UseVisualStyleBackColor = false;
         btnDeploy.Click += btnDeploy_Click;
-        //
-        // btnRestoreOriginal
-        //
-        btnRestoreOriginal.BackColor = Color.FromArgb(120, 90, 30);
-        btnRestoreOriginal.Dock = DockStyle.Bottom;
-        btnRestoreOriginal.FlatStyle = FlatStyle.Flat;
-        btnRestoreOriginal.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-        btnRestoreOriginal.ForeColor = Color.White;
-        btnRestoreOriginal.Location = new Point(0, 340);
-        btnRestoreOriginal.Name = "btnRestoreOriginal";
-        btnRestoreOriginal.Size = new Size(226, 30);
-        btnRestoreOriginal.TabIndex = 0;
-        btnRestoreOriginal.Text = "↩ Rollback Task";
-        btnRestoreOriginal.UseVisualStyleBackColor = false;
-        btnRestoreOriginal.Click += btnRestoreOriginal_Click;
-        //
+        // 
         // txtSqlPreview
-        //
+        // 
         txtSqlPreview.BackColor = Color.FromArgb(30, 30, 30);
         txtSqlPreview.Dock = DockStyle.Fill;
         txtSqlPreview.Font = new Font("Consolas", 9F);
@@ -422,14 +424,14 @@ partial class UnzipWorkbenchForm
         txtLog.BackColor = Color.FromArgb(30, 30, 30);
         txtLog.Dock = DockStyle.Fill;
         txtLog.Font = new Font("Consolas", 9F);
-        txtLog.ForeColor = Color.LightGreen;
+        txtLog.ForeColor = Color.Gainsboro;
         txtLog.Location = new Point(3, 19);
-        txtLog.Multiline = true;
         txtLog.Name = "txtLog";
         txtLog.ReadOnly = true;
-        txtLog.ScrollBars = ScrollBars.Vertical;
+        txtLog.ScrollBars = RichTextBoxScrollBars.Vertical;
         txtLog.Size = new Size(874, 137);
         txtLog.TabIndex = 0;
+        txtLog.Text = "";
         // 
         // pnlDeployBar
         // 
@@ -486,7 +488,6 @@ partial class UnzipWorkbenchForm
         splitMain.ResumeLayout(false);
         pnlBottom.ResumeLayout(false);
         grpLog.ResumeLayout(false);
-        grpLog.PerformLayout();
         pnlDeployBar.ResumeLayout(false);
         ResumeLayout(false);
     }

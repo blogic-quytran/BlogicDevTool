@@ -9,6 +9,10 @@ public partial class UnzipWorkbenchForm : UserControl
     private SqlConnectionProfile? _profile;
     private readonly Dictionary<string, string> _sqlContents = new();
 
+    // Errors collected during the current operation — listed in the result banner.
+    private readonly List<string> _runErrors = new();
+    private static readonly Font _bannerFont = new("Consolas", 18F, FontStyle.Bold);
+
     public UnzipWorkbenchForm(SqlConnectionProfile? profile = null)
     {
         _profile = profile ?? SqlSessionStore.Current;
@@ -135,6 +139,9 @@ public partial class UnzipWorkbenchForm : UserControl
 
     private async Task LoadDatabasesAsync()
     {
+        // A profile is present → the DB combo must be usable (it may have been
+        // disabled earlier when the tab opened without a login).
+        cboDatabase.Enabled = true;
         try
         {
             var helper = _profile!.CreateHelper();
@@ -290,6 +297,7 @@ public partial class UnzipWorkbenchForm : UserControl
             MessageBoxButtons.YesNo, MessageBoxIcon.Question);
         if (confirm != DialogResult.Yes) return;
 
+        _runErrors.Clear();
         SetBusy(true, $"Running '{Path.GetFileName(key)}' on [{dbName}]...");
         AppendLog($"\n>>> SQL: {key}  →  [{dbName}]  at {DateTime.Now:HH:mm:ss}");
 
@@ -300,12 +308,13 @@ public partial class UnzipWorkbenchForm : UserControl
             await helper.ExecuteSqlBatchesAsync(sql, dbName);
             sw.Stop();
             AppendLog($"✔ SQL completed in {sw.Elapsed.TotalSeconds:F1}s.");
-            SetStatus($"✔ Executed: {Path.GetFileName(key)}");
+            ShowResult(true, $"{Path.GetFileName(key)} executed on [{dbName}].");
         }
         catch (Exception ex)
         {
             AppendLog($"✘ SQL Error: {ex.Message}");
-            SetStatus("✘ Script execution failed.");
+            _runErrors.Add($"{Path.GetFileName(key)}: {ex.Message}");
+            ShowResult(false, null);
         }
         finally
         {
@@ -337,6 +346,7 @@ public partial class UnzipWorkbenchForm : UserControl
             return;
 
         var tempDir = Path.Combine(Path.GetTempPath(), $"BLogicDevTool_run_{Guid.NewGuid():N}");
+        _runErrors.Clear();
         SetBusy(true, $"Running '{Path.GetFileName(entryFullName)}'...");
         AppendLog($"\n>>> EXE: {entryFullName}  at {DateTime.Now:HH:mm:ss}");
         try
@@ -368,7 +378,8 @@ public partial class UnzipWorkbenchForm : UserControl
             if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
             {
                 AppendLog("✘ Could not extract the executable from the ZIP.");
-                SetStatus("✘ Run failed.");
+                _runErrors.Add($"{Path.GetFileName(entryFullName)}: could not extract from ZIP.");
+                ShowResult(false, null);
                 return;
             }
             AppendLog($"  Extracted to: {tempDir}");
@@ -378,18 +389,20 @@ public partial class UnzipWorkbenchForm : UserControl
             if (exit == 0)
             {
                 AppendLog("✔ Exited with code 0.");
-                SetStatus($"✔ Ran: {Path.GetFileName(entryFullName)}");
+                ShowResult(true, $"{Path.GetFileName(entryFullName)} ran successfully (exit 0).");
             }
             else
             {
-                AppendLog($"⚠ Exited with code {exit}.");
-                SetStatus($"⚠ Exit {exit}: {Path.GetFileName(entryFullName)}");
+                AppendLog($"✘ Exited with code {exit}.");
+                _runErrors.Add($"{Path.GetFileName(entryFullName)}: exited with code {exit}.");
+                ShowResult(false, null);
             }
         }
         catch (Exception ex)
         {
             AppendLog($"✘ EXE error: {ex.Message}");
-            SetStatus("✘ Run failed.");
+            _runErrors.Add($"{Path.GetFileName(entryFullName)}: {ex.Message}");
+            ShowResult(false, null);
         }
         finally
         {
@@ -465,17 +478,20 @@ public partial class UnzipWorkbenchForm : UserControl
             MessageBoxButtons.YesNo, MessageBoxIcon.Question);
         if (confirm != DialogResult.Yes) return;
 
+        _runErrors.Clear();
         SetBusy(true, "Deploying...");
         txtLog.Clear();
 
         try
         {
             await DeployAsync(zipPath, mappings);
+            ShowResult(_runErrors.Count == 0, "Deployment finished.");
         }
         catch (Exception ex)
         {
             AppendLog($"\n✘ Fatal error: {ex.Message}");
-            SetStatus("✘ Deployment failed.");
+            _runErrors.Add("Fatal: " + ex.Message);
+            ShowResult(false, null);
         }
         finally
         {
@@ -570,10 +586,18 @@ public partial class UnzipWorkbenchForm : UserControl
                         if (added.Add(fullDest)) newlyAdded++;
                     }
 
-                    entry.ExtractToFile(destPath, overwrite: true);
-                    fileCount++;
-                    totalFiles++;
-                    AppendLog($"     → {relativePath}");
+                    try
+                    {
+                        entry.ExtractToFile(destPath, overwrite: true);
+                        fileCount++;
+                        totalFiles++;
+                        AppendLog($"     → {relativePath}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _runErrors.Add($"{mapping.FolderName}/{relativePath}: {ex.Message}");
+                        AppendLog($"     ✘ {relativePath}: {ex.Message}");
+                    }
                 }
 
                 AppendLog($"  ✔ Copied {fileCount} file(s).");
@@ -759,8 +783,65 @@ public partial class UnzipWorkbenchForm : UserControl
     private void AppendLog(string message)
     {
         if (InvokeRequired) { Invoke(() => AppendLog(message)); return; }
-        txtLog.AppendText(message + Environment.NewLine);
+        AppendColored(message + Environment.NewLine, LineColor(message), null);
+    }
+
+    /// <summary>Picks a colour from the line's leading marker (✔ green, ✘ red, ⚠ orange).</summary>
+    private static Color LineColor(string message)
+    {
+        var t = message.TrimStart();
+        if (t.StartsWith("✔") || t.StartsWith("↩")) return Color.LightGreen;
+        if (t.StartsWith("✘")) return Color.FromArgb(255, 110, 110);
+        if (t.StartsWith("⚠")) return Color.Orange;
+        if (t.StartsWith(">>>")) return Color.FromArgb(120, 180, 255);
+        return Color.Gainsboro;
+    }
+
+    private void AppendColored(string text, Color color, Font? font)
+    {
+        if (InvokeRequired) { Invoke(() => AppendColored(text, color, font)); return; }
+        txtLog.SelectionStart = txtLog.TextLength;
+        txtLog.SelectionLength = 0;
+        txtLog.SelectionColor = color;
+        if (font != null) txtLog.SelectionFont = font;
+        txtLog.AppendText(text);
+        txtLog.SelectionColor = txtLog.ForeColor;
+        if (font != null) txtLog.SelectionFont = txtLog.Font;
         txtLog.ScrollToCaret();
+    }
+
+    /// <summary>
+    /// Prints the big result banner at the end of an operation: a large green
+    /// "COMPLETE" on success, or a red "FAILED" followed by the list of errors
+    /// (which file / what went wrong) collected in <see cref="_runErrors"/>.
+    /// </summary>
+    private void ShowResult(bool success, string? summary)
+    {
+        if (InvokeRequired) { Invoke(() => ShowResult(success, summary)); return; }
+        AppendColored(Environment.NewLine, txtLog.ForeColor, null);
+        if (success && _runErrors.Count == 0)
+        {
+            AppendColored("  ✔  COMPLETE" + Environment.NewLine, Color.LimeGreen, _bannerFont);
+            if (!string.IsNullOrWhiteSpace(summary))
+                AppendColored("  " + summary + Environment.NewLine, Color.LightGreen, null);
+            SetStatus("✔ " + (summary ?? "Complete."));
+        }
+        else
+        {
+            AppendColored("  ✘  FAILED" + Environment.NewLine, Color.Red, _bannerFont);
+            if (_runErrors.Count > 0)
+            {
+                AppendColored($"  {_runErrors.Count} error(s):" + Environment.NewLine,
+                    Color.FromArgb(255, 110, 110), null);
+                foreach (var err in _runErrors)
+                    AppendColored("   • " + err + Environment.NewLine,
+                        Color.FromArgb(255, 110, 110), null);
+            }
+            else if (!string.IsNullOrWhiteSpace(summary))
+                AppendColored("  " + summary + Environment.NewLine,
+                    Color.FromArgb(255, 110, 110), null);
+            SetStatus("✘ Failed — see log.");
+        }
     }
 
     private void UpdateButtonStates()
