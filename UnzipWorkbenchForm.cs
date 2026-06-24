@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace BLogicDevTool;
 
@@ -208,7 +209,7 @@ public partial class UnzipWorkbenchForm : UserControl
                 if (entry.Name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
                 {
                     using var reader = new StreamReader(entry.Open());
-                    _sqlContents[entry.FullName] = reader.ReadToEnd();
+                    _sqlContents[entry.FullName] = NormalizeNewlines(reader.ReadToEnd());
                 }
                 lstSqlFiles.Items.Add(entry.FullName);
             }
@@ -227,6 +228,34 @@ public partial class UnzipWorkbenchForm : UserControl
 
     private static bool IsExe(string name) =>
         name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Converts any mix of CR / LF / CRLF to CRLF so the multiline TextBox
+    /// renders line breaks correctly (it only recognises CRLF).</summary>
+    private static string NormalizeNewlines(string s) =>
+        s.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", "\r\n");
+
+    /// <summary>The store-database placeholder used in scripts; only USE statements
+    /// targeting THIS database get re-pointed to the selected DB. Other databases
+    /// (Merchant, master, BLogicEmailService, …) are left untouched.</summary>
+    private const string StoreDbPlaceholder = "BLogicPOS7";
+
+    /// <summary>
+    /// Rewrites only line-leading <c>USE [BLogicPOS7]</c> / <c>USE BLogicPOS7</c>
+    /// (case-insensitive) to <c>USE [dbName]</c> so the script targets the selected
+    /// store database. USE statements for any other database are preserved, and a
+    /// trailing comment on the line is kept.
+    /// </summary>
+    private static string ReplaceUseDatabase(string sql, string dbName) =>
+        Regex.Replace(
+            sql,
+            @"(?im)^(\s*USE\s+)(\[[^\]]+\]|[^\s;]+)",
+            m =>
+            {
+                var target = m.Groups[2].Value.Trim().Trim('[', ']');
+                return target.Equals(StoreDbPlaceholder, StringComparison.OrdinalIgnoreCase)
+                    ? m.Groups[1].Value + "[" + dbName + "]"
+                    : m.Value; // leave Merchant / master / etc. as-is
+            });
 
     private void lstSqlFiles_SelectedIndexChanged(object sender, EventArgs e)
     {
@@ -303,9 +332,16 @@ public partial class UnzipWorkbenchForm : UserControl
 
         try
         {
+            // Re-target any USE [...] in the script to the selected database, so the
+            // script always runs against the DB the user picked (not the one hardcoded
+            // in the file, e.g. "USE [BLogicPOS7]").
+            var runSql = ReplaceUseDatabase(sql, dbName);
+            if (runSql != sql)
+                AppendLog($"  ↳ Re-targeted USE [...] → [{dbName}]");
+
             var helper = _profile.CreateHelper();
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            await helper.ExecuteSqlBatchesAsync(sql, dbName);
+            await helper.ExecuteSqlBatchesAsync(runSql, dbName);
             sw.Stop();
             AppendLog($"✔ SQL completed in {sw.Elapsed.TotalSeconds:F1}s.");
             ShowResult(true, $"{Path.GetFileName(key)} executed on [{dbName}].");

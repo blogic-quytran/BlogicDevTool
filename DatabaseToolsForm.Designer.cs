@@ -461,7 +461,7 @@ partial class DatabaseToolsForm
         lblZipRestoreStatus.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
         lblZipRestoreStatus.Font = new Font("Segoe UI", 9F);
         lblZipRestoreStatus.ForeColor = Color.DarkGray;
-        lblZipRestoreStatus.Location = new Point(8, 560);
+        lblZipRestoreStatus.Location = new Point(8, 564);
         lblZipRestoreStatus.Name = "lblZipRestoreStatus";
         lblZipRestoreStatus.Size = new Size(640, 22);
         lblZipRestoreStatus.TabIndex = 4;
@@ -470,10 +470,10 @@ partial class DatabaseToolsForm
         // pbRestore
         // 
         pbRestore.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-        pbRestore.Location = new Point(8, 585);
+        pbRestore.Location = new Point(8, 594);
         pbRestore.MarqueeAnimationSpeed = 30;
         pbRestore.Name = "pbRestore";
-        pbRestore.Size = new Size(736, 8);
+        pbRestore.Size = new Size(859, 5);
         pbRestore.Style = ProgressBarStyle.Marquee;
         pbRestore.TabIndex = 6;
         pbRestore.Visible = false;
@@ -485,7 +485,7 @@ partial class DatabaseToolsForm
         btnExecuteRestoreFromZip.FlatStyle = FlatStyle.Flat;
         btnExecuteRestoreFromZip.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
         btnExecuteRestoreFromZip.ForeColor = Color.White;
-        btnExecuteRestoreFromZip.Location = new Point(750, 563);
+        btnExecuteRestoreFromZip.Location = new Point(747, 558);
         btnExecuteRestoreFromZip.Name = "btnExecuteRestoreFromZip";
         btnExecuteRestoreFromZip.Size = new Size(116, 32);
         btnExecuteRestoreFromZip.TabIndex = 5;
