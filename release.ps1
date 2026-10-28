@@ -1,8 +1,10 @@
 # Publishes a new BLogicDevTool release on GitHub; running copies pick it up via UpdateService.
-#   .\release.ps1                      -> bump patch (1.0.3 -> 1.0.4)
-#   .\release.ps1 -Version 1.2.0 -Notes "- Added X`n- Fixed Y"
+#   .\release.ps1 -Description "Fix DB restore"         -> bump patch (1.0.3 -> 1.0.4)
+#   .\release.ps1 -Version 1.2.0 -Description "WebDAV upload" -Notes "- Added X`n- Fixed Y"
+# -Description is the one-line summary shown in the app's update banner/dialog.
 param(
     [string]$Version,
+    [string]$Description,
     [string]$Notes
 )
 
@@ -34,6 +36,10 @@ if (-not $Notes) {
     $Notes = (git log $range --no-merges --pretty=format:'- %s' | Where-Object { $_ -notmatch '^- Release v' }) -join "`n"
     if (-not $Notes) { $Notes = "Release $tag" }
 }
+if (-not $Description) {
+    $Description = git log -1 --no-merges --pretty=format:'%s' --grep='^Release v' --invert-grep
+}
+$title = if ($Description) { "$tag - $Description" } else { $tag }
 
 Write-Host "Releasing $tag (current csproj version $current, previous tag $prevTag)" -ForegroundColor Cyan
 
@@ -63,7 +69,7 @@ Run git @('push', 'origin', $tag)
 $notesFile = Join-Path $env:TEMP "blogic_release_notes_$tag.md"
 [IO.File]::WriteAllText($notesFile, $Notes, (New-Object Text.UTF8Encoding $false))
 try {
-    Run gh @('release', 'create', $tag, $exe, '--title', $tag, '--notes-file', $notesFile)
+    Run gh @('release', 'create', $tag, $exe, '--title', $title, '--notes-file', $notesFile)
 } finally {
     Remove-Item $notesFile -Force -ErrorAction SilentlyContinue
 }

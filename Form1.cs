@@ -70,6 +70,15 @@ public partial class Form1 : Form
         catch { return; } // offline / rate-limited — silently skip, retry next launch
         if (info == null || IsDisposed) return;
         ShowUpdateBanner(info);
+        // Cancel is not remembered on purpose: every launch asks again until the user updates.
+        if (!AppBusyState.IsBusy)
+            ShowUpdateDialog(info);
+    }
+
+    private void ShowUpdateDialog(UpdateInfo info)
+    {
+        using var dlg = new UpdateForm(info);
+        dlg.ShowDialog(this);
     }
 
     private void ShowUpdateBanner(UpdateInfo info)
@@ -77,27 +86,28 @@ public partial class Form1 : Form
         var banner = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = Color.FromArgb(255, 243, 205) };
         var lbl = new Label
         {
-            Text      = $"🔔 New version {info.Tag} is available (current {UpdateService.CurrentVersionText}).",
-            AutoSize  = true,
+            Text      = string.IsNullOrEmpty(info.Summary)
+                ? $"🔔 New version {info.Tag} is available (current {UpdateService.CurrentVersionText})."
+                : $"🔔 New version {info.Tag}: {info.Summary}",
+            AutoEllipsis = true,
             Font      = new Font("Segoe UI", 9F, FontStyle.Bold),
             ForeColor = Color.FromArgb(102, 77, 3),
             Location  = new Point(10, 7),
         };
+        // Long summaries get "..." so the button stays on screen; the full text is in the tooltip/dialog.
+        lbl.Size = new Size(Math.Min(lbl.PreferredWidth, 700), 18);
+        new ToolTip().SetToolTip(lbl, lbl.Text);
         var btnView = new Button
         {
             Text      = "View && install",
             Size      = new Size(110, 24),
-            Location  = new Point(lbl.PreferredWidth + 20, 3),
+            Location  = new Point(lbl.Right + 10, 3),
             BackColor = Color.FromArgb(0, 102, 204),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
         };
         btnView.FlatAppearance.BorderSize = 0;
-        btnView.Click += (_, _) =>
-        {
-            using var dlg = new UpdateForm(info);
-            dlg.ShowDialog(this);
-        };
+        btnView.Click += (_, _) => ShowUpdateDialog(info);
         var btnHide = new Button
         {
             Text      = "✕",

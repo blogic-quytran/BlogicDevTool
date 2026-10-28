@@ -11,6 +11,8 @@ public sealed class UpdateInfo
 {
     public required Version Version { get; init; }
     public required string Tag { get; init; }
+    /// <summary>One-line description: the release title minus the "vX.Y.Z —" prefix.</summary>
+    public required string Summary { get; init; }
     public required string Notes { get; init; }
     public required string HtmlUrl { get; init; }
     public required string DownloadUrl { get; init; }
@@ -66,10 +68,16 @@ public static class UpdateService
                 && d.GetString() is { } digest && digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
                 sha = digest["sha256:".Length..];
 
+            var title = root.TryGetProperty("name", out var nm) ? nm.GetString() ?? "" : "";
+            var summary = title.StartsWith(tag, StringComparison.OrdinalIgnoreCase)
+                ? title[tag.Length..].TrimStart(' ', '-', '—', '–', ':')
+                : title;
+
             return new UpdateInfo
             {
                 Version     = latest,
                 Tag         = tag,
+                Summary     = summary.Trim(),
                 Notes       = root.TryGetProperty("body", out var b) ? b.GetString() ?? "" : "",
                 HtmlUrl     = root.GetProperty("html_url").GetString() ?? $"https://github.com/{Repo}/releases",
                 DownloadUrl = asset.GetProperty("browser_download_url").GetString()!,

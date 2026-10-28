@@ -41,7 +41,14 @@ public sealed class UpdateForm : Form
             Location  = new Point(18, 44),
             AutoSize  = true,
         };
-        var lblNotes = new Label { Text = "What's new:", Location = new Point(16, 72), AutoSize = true };
+        var lblSummary = new Label
+        {
+            Text      = string.IsNullOrEmpty(info.Summary) ? "" : $"📝 {info.Summary}",
+            Font      = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Location  = new Point(16, 68),
+            Size      = new Size(528, 40),
+        };
+        var lblNotes = new Label { Text = "Details:", Location = new Point(16, 112), AutoSize = true };
 
         _txtNotes = new TextBox
         {
@@ -49,8 +56,8 @@ public sealed class UpdateForm : Form
             ReadOnly   = true,
             ScrollBars = ScrollBars.Vertical,
             BackColor  = Color.White,
-            Location   = new Point(16, 92),
-            Size       = new Size(528, 220),
+            Location   = new Point(16, 132),
+            Size       = new Size(528, 180),
             // GitHub returns LF; a WinForms TextBox only breaks lines on CRLF.
             Text       = string.IsNullOrWhiteSpace(info.Notes) ? "(no release notes)" : info.Notes.Replace("\r\n", "\n").Replace("\n", "\r\n"),
         };
@@ -73,9 +80,9 @@ public sealed class UpdateForm : Form
         _btnInstall.FlatAppearance.BorderSize = 0;
         _btnInstall.Click += btnInstall_Click;
 
-        _btnLater = new Button { Text = "Later", Location = new Point(456, 374), Size = new Size(88, 32), DialogResult = DialogResult.Cancel };
+        _btnLater = new Button { Text = "Cancel", Location = new Point(456, 374), Size = new Size(88, 32), DialogResult = DialogResult.Cancel };
 
-        Controls.AddRange(new Control[] { lblHeader, lblSub, lblNotes, _txtNotes, _progress, _lblStatus, lnkGitHub, _btnInstall, _btnLater });
+        Controls.AddRange(new Control[] { lblHeader, lblSub, lblSummary, lblNotes, _txtNotes, _progress, _lblStatus, lnkGitHub, _btnInstall, _btnLater });
         AcceptButton = _btnInstall;
         CancelButton = _btnLater;
     }
