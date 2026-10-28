@@ -8,11 +8,25 @@ namespace BLogicDevTool;
 
 public static class BuildHelper
 {
+    /// <summary><paramref name="cleanSolution"/> off means an incremental build: MSBuild skips
+    /// what is already up to date, which is the difference between seconds and a full rebuild.</summary>
     public static async Task<(int ExitCode, string FullOutput)> BuildSolutionAsync(
-        string solutionPath, string configuration, string engine, Action<string>? logger = null)
+        string solutionPath, string configuration, string engine,
+        bool cleanSolution = true, Action<string>? logger = null)
     {
         var workingDir = Path.GetDirectoryName(solutionPath) ?? Environment.CurrentDirectory;
         var combined = new StringBuilder();
+
+        // The .NET SDK ("dotnet build") can't build legacy non-SDK .NET Framework
+        // projects (MSB3644). If the user picked dotnet but the solution contains such
+        // a project, transparently switch to MSBuild so the build just works.
+        if (!string.Equals(engine, "msbuild", StringComparison.OrdinalIgnoreCase)
+            && SolutionRequiresMsBuild(solutionPath, out var legacyName))
+        {
+            logger?.Invoke($"[INFO] Detected legacy .NET Framework project ('{legacyName}') — " +
+                           "the .NET SDK cannot build it. Switching engine → MSBuild (Visual Studio).");
+            engine = "msbuild";
+        }
 
         if (string.Equals(engine, "msbuild", StringComparison.OrdinalIgnoreCase))
         {
@@ -26,16 +40,20 @@ public static class BuildHelper
             }
             logger?.Invoke($"[INFO] Using MSBuild: {msbuild}");
 
-            // Clean first, then build — so stale artifacts never leak into the release.
-            logger?.Invoke("[INFO] Cleaning solution...");
-            var cleanArgs = $"\"{solutionPath}\" /t:Clean " +
-                            $"/p:Configuration={configuration} " +
-                            $"/m /nologo /v:minimal";
-            var (cleanExit, cleanOut) = await RunProcessAsync(msbuild, cleanArgs, workingDir,
-                timeoutMs: 1_800_000, logger);
-            combined.AppendLine(cleanOut);
-            if (cleanExit != 0)
-                logger?.Invoke($"[WARN] Clean returned exit {cleanExit}; continuing to build.");
+            if (cleanSolution)
+            {
+                logger?.Invoke("[INFO] Cleaning solution...");
+                var cleanArgs = $"\"{solutionPath}\" /t:Clean " +
+                                $"/p:Configuration={configuration} " +
+                                $"/m /nologo /v:minimal";
+                var (cleanExit, cleanOut) = await RunProcessAsync(msbuild, cleanArgs, workingDir,
+                    timeoutMs: 1_800_000, logger);
+                combined.AppendLine(cleanOut);
+                if (cleanExit != 0 && !ReportCleanFailure(cleanExit, cleanOut, logger))
+                    return (cleanExit, combined.ToString());
+            }
+            else
+                logger?.Invoke("[INFO] Incremental build ('Clean first' is off — no solution clean).");
 
             logger?.Invoke("[INFO] Building solution...");
             var msArgs = $"\"{solutionPath}\" /t:Build " +
@@ -47,14 +65,18 @@ public static class BuildHelper
             return (buildExit, combined.ToString());
         }
 
-        // dotnet engine: clean first, then build.
-        logger?.Invoke("[INFO] Cleaning solution...");
-        var dotnetCleanArgs = $"clean \"{solutionPath}\" -c {configuration} --nologo -v minimal";
-        var (dcExit, dcOut) = await RunProcessAsync("dotnet", dotnetCleanArgs, workingDir,
-            timeoutMs: 1_800_000, logger);
-        combined.AppendLine(dcOut);
-        if (dcExit != 0)
-            logger?.Invoke($"[WARN] Clean returned exit {dcExit}; continuing to build.");
+        if (cleanSolution)
+        {
+            logger?.Invoke("[INFO] Cleaning solution...");
+            var dotnetCleanArgs = $"clean \"{solutionPath}\" -c {configuration} --nologo -v minimal";
+            var (dcExit, dcOut) = await RunProcessAsync("dotnet", dotnetCleanArgs, workingDir,
+                timeoutMs: 1_800_000, logger);
+            combined.AppendLine(dcOut);
+            if (dcExit != 0 && !ReportCleanFailure(dcExit, dcOut, logger))
+                return (dcExit, combined.ToString());
+        }
+        else
+            logger?.Invoke("[INFO] Incremental build ('Clean first' is off — no solution clean).");
 
         logger?.Invoke("[INFO] Building solution...");
         var dotnetArgs = $"build \"{solutionPath}\" -c {configuration} --nologo -v minimal";
@@ -289,6 +311,76 @@ public static class BuildHelper
         {
             try { File.SetAttributes(f, FileAttributes.Normal); } catch { /* best effort */ }
         }
+    }
+
+    // Clean codes that mean "an output file is locked", not "the tree is broken" — the
+    // usual case here is the built app still running.
+    private static readonly string[] LockedFileErrorCodes =
+        { "MSB3061", "MSB3062", "MSB3026", "MSB3027", "MSB3021" };
+
+    /// <summary>Logs a non-zero clean and returns true when the build may continue: a locked
+    /// output file is a warning, anything else aborts before we build something tainted.</summary>
+    private static bool ReportCleanFailure(int exitCode, string? output, Action<string>? logger)
+    {
+        var errors = (output ?? "").Replace("\r", "").Split('\n')
+            .Where(l => l.Contains(": error ", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var onlyLocks = errors.Count == 0 || errors.All(l =>
+            LockedFileErrorCodes.Any(c => l.Contains(c, StringComparison.OrdinalIgnoreCase))
+            || l.Contains("being used by another process", StringComparison.OrdinalIgnoreCase)
+            || l.Contains("Access to the path", StringComparison.OrdinalIgnoreCase)
+            || l.Contains("Access is denied", StringComparison.OrdinalIgnoreCase));
+
+        if (onlyLocks)
+        {
+            logger?.Invoke($"[WARN] Clean returned exit {exitCode} " +
+                           "(locked/undeletable output only); continuing to build.");
+            return true;
+        }
+
+        logger?.Invoke($"[ERROR] Clean failed (exit {exitCode}); stopping — build aborted.");
+        foreach (var e in errors.Take(5))
+            logger?.Invoke("    → " + e.Trim());
+        return false;
+    }
+
+    /// <summary>True if any project in the solution is non-SDK-style, i.e. one "dotnet
+    /// build" can't build. Best-effort: any error means false.</summary>
+    private static bool SolutionRequiresMsBuild(string solutionPath, out string? legacyProjectName)
+    {
+        legacyProjectName = null;
+        try
+        {
+            foreach (var proj in FindAllProjectsInSolution(solutionPath))
+            {
+                if (IsLegacyProject(proj))
+                {
+                    legacyProjectName = Path.GetFileNameWithoutExtension(proj);
+                    return true;
+                }
+            }
+        }
+        catch { /* detection is best-effort — fall through to false */ }
+        return false;
+    }
+
+    /// <summary>Legacy = the old MSBuild format, which declares its SDK in none of the three
+    /// ways an SDK-style project can (Project Sdk attribute, &lt;Sdk&gt; child, Import Sdk).</summary>
+    private static bool IsLegacyProject(string csprojPath)
+    {
+        try
+        {
+            if (!File.Exists(csprojPath)) return false;
+            var root = XDocument.Load(csprojPath).Root;
+            if (root == null) return false;
+            if (!string.IsNullOrWhiteSpace(root.Attribute("Sdk")?.Value)) return false;
+
+            var ns = root.Name.Namespace;
+            if (root.Elements(ns + "Sdk").Any()) return false;
+            return !root.Elements(ns + "Import").Any(i => i.Attribute("Sdk") != null);
+        }
+        catch { return false; }
     }
 
     public static List<string> FindAllProjectsInSolution(string solutionPath)

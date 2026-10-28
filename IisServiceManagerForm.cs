@@ -78,25 +78,7 @@ public partial class IisServiceManagerForm : UserControl
         try
         {
             _apps = await Task.Run(IisHelper.GetApplications);
-            dgvApps.DataSource = null;
-            dgvApps.DataSource = _apps.Select(a => new
-            {
-                Site = a.SiteName,
-                App = a.AppPath,
-                a.AppPoolName,
-                PhysicalPath = a.PhysicalPath,
-                Database = a.CurrentDatabase
-            }).ToList();
-
-            // column widths
-            if (dgvApps.Columns.Count > 0)
-            {
-                dgvApps.Columns["Site"].Width = 100;
-                dgvApps.Columns["App"].Width = 160;
-                dgvApps.Columns["AppPoolName"].Width = 200;
-                dgvApps.Columns["PhysicalPath"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                dgvApps.Columns["Database"].Width = 0;
-            }
+            BindGrid();
 
             SetStatus("Loaded successfully. Select a row to view details.");
 
@@ -126,7 +108,9 @@ public partial class IisServiceManagerForm : UserControl
     {
         lblDetailSite.Text = $"{app.SiteName}{app.AppPath}";
         txtDetailPath.Text = app.PhysicalPath;
-        txtDetailDb.Text   = app.CurrentDatabase;
+        txtDetailDb.Text = app.ConnStrings.Count == 0
+            ? (app.ConfigPath == null ? "(no Web.config)" : "(no connection string)")
+            : string.Join("   |   ", app.ConnStrings.Select(c => $"{c.Label}={c.Database}"));
 
         // If DB is empty, suggest the currently selected item or keep previous text
         if (!string.IsNullOrWhiteSpace(app.CurrentDatabase))
@@ -184,11 +168,31 @@ public partial class IisServiceManagerForm : UserControl
             return;
         }
 
+        var primary = WebConfigConnStrings.PickPrimary(_selected.ConnStrings);
+        if (primary == null)
+        {
+            ShowWarn(_selected.ConfigPath == null
+                ? $"{_selected.Display} has no Web.config — there is nothing to update."
+                : $"{Path.GetFileName(_selected.ConfigPath)} holds no connection string.");
+            return;
+        }
+
+        // Only the primary entry is rewritten. Anything else needs Switch Environment,
+        // where each connection string gets its own target.
+        var others = _selected.ConnStrings.Where(c => c != primary).ToList();
+        var othersNote = others.Count == 0
+            ? ""
+            : "\n\nLeft untouched (use Switch Environment for these):\n" +
+              string.Join("\n", others.Select(c => $"   • {c.Label} = {c.Database}"));
+
         var confirmMsg =
-            $"Update DB for: {_selected.SiteName}{_selected.AppPath}\n\n" +
+            $"Update DB for: {_selected.Display}\n\n" +
+            $"• Connection string: {primary.Label}\n" +
+            $"• Current DB: {(primary.Database.Length > 0 ? primary.Database : "(none)")}\n" +
             $"• New DB: {newDb}\n" +
-            $"• Current path: {_selected.PhysicalPath}\n\n" +
-            "Will backup current snapshot and restart IIS. Continue?";
+            $"• Config: {_selected.ConfigPath}\n" +
+            othersNote +
+            $"\n\nThe Web.config is backed up first, then app pool '{_selected.AppPoolName}' is recycled. Continue?";
 
         if (MessageBox.Show(confirmMsg, "Confirm Update DB",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
@@ -199,15 +203,27 @@ public partial class IisServiceManagerForm : UserControl
         {
             IisLocalStore.SaveSnapshot(_selected);
 
-            await Task.Run(() =>
-                IisHelper.SetDatabaseInWebConfig(_selected.PhysicalPath, newDb));
+            var result = await Task.Run(() => IisHelper.SetConnStringInWebConfig(
+                _selected.PhysicalPath, primary.Kind, primary.Name, null, newDb));
 
-            SetStatus("Restarting IIS...");
-            await IisHelper.RestartIisAsync();
+            if (!result.Success)
+            {
+                // A silent no-op here used to report success and restart IIS anyway,
+                // leaving the service on the old database.
+                ShowError("DB was NOT updated:\n\n" + (result.Error ?? "unknown error"));
+                SetStatus("✘ DB not updated.");
+                return;
+            }
 
-            SetStatus($"✔ DB updated successfully. DB: {newDb}");
-            MessageBox.Show("DB updated successfully!\nIIS has been restarted.", "Success",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            SetStatus($"Recycling app pool '{_selected.AppPoolName}'...");
+            var poolLog = await IisHelper.RecycleAppPoolsAsync(new[] { _selected.AppPoolName });
+
+            SetStatus($"✔ DB updated: {result.OldDatabase} → {result.NewDatabase}");
+            MessageBox.Show(
+                $"DB updated: {result.OldDatabase} → {result.NewDatabase}\n\n" +
+                $"Backup: {result.BackupPath}\n" +
+                string.Join("\n", poolLog),
+                "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             await RefreshSelectedEntry();
         }
@@ -215,6 +231,37 @@ public partial class IisServiceManagerForm : UserControl
         {
             ShowError("Error updating DB:\n" + ex.Message);
             SetStatus("Error.");
+        }
+        finally { SetBusy(false); refreshDgv(); }
+    }
+
+    private async void btnSwitchEnv_Click(object sender, EventArgs e)
+    {
+        // The switch picks databases from the server's list, so it needs a login up front.
+        if (SqlSessionStore.Current == null)
+        {
+            using var login = new SqlLoginForm();
+            if (login.ShowDialog(FindForm()) != DialogResult.OK || login.Profile == null) return;
+            SqlSessionStore.SetProfile(login.Profile);
+        }
+
+        string? summary;
+        using (var dlg = new IisEnvironmentSwitchForm(SqlSessionStore.Current))
+        {
+            dlg.ShowDialog(FindForm());
+            summary = dlg.ResultSummary;
+        }
+
+        SetBusy(true, "Reloading IIS list...");
+        try
+        {
+            await RefreshSelectedEntry();
+            SetStatus(summary ?? "Loaded successfully. Select a row to view details.");
+        }
+        catch (Exception ex)
+        {
+            ShowError("Failed to load IIS list:\n" + ex.Message);
+            SetStatus("Load failed.");
         }
         finally { SetBusy(false); refreshDgv(); }
     }
@@ -282,11 +329,20 @@ public partial class IisServiceManagerForm : UserControl
             return;
         }
 
+        // An empty snapshot DB would be written back as "Initial Catalog=", which kills the service.
+        if (string.IsNullOrWhiteSpace(snap.Database))
+        {
+            ShowWarn(
+                $"The snapshot for {_selected.Display} recorded no database name, so there is " +
+                "nothing to restore. Set the database explicitly instead.");
+            return;
+        }
+
         var confirmMsg =
             $"Restore DB from snapshot saved at {snap.SavedAt:dd/MM/yyyy HH:mm}?\n\n" +
             $"• DB: {snap.Database}\n" +
             $"• Snapshot path: {snap.PhysicalPath}\n\n" +
-            "Will restart IIS. Continue?";
+            $"The Web.config is backed up first, then app pool '{_selected.AppPoolName}' is recycled. Continue?";
 
         if (MessageBox.Show(confirmMsg, "Confirm Restore DB",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
@@ -295,15 +351,25 @@ public partial class IisServiceManagerForm : UserControl
         SetBusy(true, "Restoring DB...");
         try
         {
-            await Task.Run(() =>
+            var result = await Task.Run(() =>
                 IisHelper.SetDatabaseInWebConfig(_selected.PhysicalPath, snap.Database));
 
-            SetStatus("Restarting IIS...");
-            await IisHelper.RestartIisAsync();
+            if (!result.Success)
+            {
+                ShowError("DB was NOT restored:\n\n" + (result.Error ?? "unknown error"));
+                SetStatus("✘ DB not restored.");
+                return;
+            }
 
-            SetStatus($"✔ DB restored successfully. DB: {snap.Database}");
-            MessageBox.Show("DB restored successfully!\nIIS has been restarted.", "Success",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            SetStatus($"Recycling app pool '{_selected.AppPoolName}'...");
+            var poolLog = await IisHelper.RecycleAppPoolsAsync(new[] { _selected.AppPoolName });
+
+            SetStatus($"✔ DB restored: {result.OldDatabase} → {result.NewDatabase}");
+            MessageBox.Show(
+                $"DB restored: {result.OldDatabase} → {result.NewDatabase}\n\n" +
+                $"Backup: {result.BackupPath}\n" +
+                string.Join("\n", poolLog),
+                "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             await RefreshSelectedEntry();
         }
@@ -457,15 +523,7 @@ public partial class IisServiceManagerForm : UserControl
     private async Task RefreshSelectedEntry()
     {
         _apps = await Task.Run(IisHelper.GetApplications);
-        dgvApps.DataSource = null;
-        dgvApps.DataSource = _apps.Select(a => new
-        {
-            Site = a.SiteName,
-            App = a.AppPath,
-            a.AppPoolName,
-            PhysicalPath = a.PhysicalPath,
-            Database = a.CurrentDatabase
-        }).ToList();
+        BindGrid();
 
         if (_selected != null)
         {
@@ -485,6 +543,7 @@ public partial class IisServiceManagerForm : UserControl
         progressBar.Visible = busy;
         btnRefresh.Enabled = !busy;
         btnTroubleshoot.Enabled = !busy;
+        btnSwitchEnv.Enabled = !busy;
         btnChange.Enabled = !busy;
         btnResetDb.Enabled = !busy;
         btnChangePath.Enabled = !busy;
@@ -504,16 +563,32 @@ public partial class IisServiceManagerForm : UserControl
                 : System.Drawing.Color.DarkGray;
     }
 
+    /// <summary>Rebinds the grid and applies the column widths. Database lists EVERY connection
+    /// string of the app, so a second one cannot sit there unnoticed.</summary>
+    private void BindGrid()
+    {
+        dgvApps.DataSource = null;
+        dgvApps.DataSource = _apps.Select(a => new
+        {
+            Site = a.SiteName,
+            App = a.AppPath,
+            a.AppPoolName,
+            PhysicalPath = a.PhysicalPath,
+            Database = a.DatabaseSummary
+        }).ToList();
+
+        refreshDgv();
+    }
+
     private void refreshDgv()
     {
-        if (dgvApps.Columns.Count > 0)
-        {
-            dgvApps.Columns["Site"].Width = 160;
-            dgvApps.Columns["App"].Width = 100;
-            dgvApps.Columns["AppPoolName"].Width = 150;
-            dgvApps.Columns["PhysicalPath"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            dgvApps.Columns["Database"].Width = 200;
-        }
+        if (dgvApps.Columns.Count == 0) return;
+
+        dgvApps.Columns["Site"].Width = 160;
+        dgvApps.Columns["App"].Width = 100;
+        dgvApps.Columns["AppPoolName"].Width = 150;
+        dgvApps.Columns["PhysicalPath"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        dgvApps.Columns["Database"].Width = 200;
     }
 
     private static void ShowError(string msg) =>

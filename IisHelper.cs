@@ -12,6 +12,28 @@ public class IisAppEntry
     public string PhysicalPath { get; set; } = "";
     public string CurrentDatabase { get; set; } = "";
     public string AppPoolName { get; set; } = "";
+
+    /// <summary>Full path to this app's Web.config, or null when it has none.</summary>
+    public string? ConfigPath { get; set; }
+
+    /// <summary>Every connection string found in the Web.config.</summary>
+    public List<ConnStringEntry> ConnStrings { get; set; } = new();
+
+    public string Display => $"{SiteName}{AppPath}";
+
+    /// <summary>All databases this app points at, so a second connection string cannot hide.</summary>
+    public string DatabaseSummary
+    {
+        get
+        {
+            var dbs = ConnStrings
+                .Where(c => c.Database.Length > 0)
+                .Select(c => c.Database)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return dbs.Count == 0 ? "" : string.Join(", ", dbs);
+        }
+    }
 }
 
 public static class IisHelper
@@ -27,16 +49,19 @@ public static class IisHelper
             foreach (var app in site.Applications)
             {
                 var vdir = app.VirtualDirectories["/"];
-                var physPath = vdir?.PhysicalPath ?? "";
+                var physPath = Environment.ExpandEnvironmentVariables(vdir?.PhysicalPath ?? "");
+                var configPath = WebConfigConnStrings.ResolveConfigPath(physPath);
+                var connStrings = WebConfigConnStrings.Read(configPath);
 
                 result.Add(new IisAppEntry
                 {
                     SiteName = site.Name,
                     AppPath = app.Path,
-                    PhysicalPath = Environment.ExpandEnvironmentVariables(physPath),
+                    PhysicalPath = physPath,
                     AppPoolName = app.ApplicationPoolName,
-                    CurrentDatabase = ReadDatabaseFromWebConfig(
-                        Environment.ExpandEnvironmentVariables(physPath))
+                    ConfigPath = configPath,
+                    ConnStrings = connStrings,
+                    CurrentDatabase = WebConfigConnStrings.PickPrimary(connStrings)?.Database ?? ""
                 });
             }
         }
@@ -45,98 +70,53 @@ public static class IisHelper
 
     // ── Web.config helpers ────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Reads the Initial Catalog from the NHibernate property element:
-    /// &lt;property name="connection.connection_string"&gt;...Initial Catalog=XXX...&lt;/property&gt;
-    /// Falls back to any connectionStrings/add element.
-    /// </summary>
+    /// <summary>Database of this app's primary connection string, or "" when it has none.</summary>
     public static string ReadDatabaseFromWebConfig(string physicalPath)
     {
-        var configPath = Path.Combine(physicalPath, "Web.config");
-        if (!File.Exists(configPath)) return "";
-
-        try
-        {
-            var doc = XDocument.Load(configPath);
-
-            // 1. NHibernate-style <property name="connection.connection_string">
-            var nhProp = doc.Descendants("property")
-                .FirstOrDefault(e =>
-                    (string?)e.Attribute("name") == "connection.connection_string");
-            if (nhProp != null)
-                return ExtractInitialCatalog(nhProp.Value);
-
-            // 2. Standard <connectionStrings>
-            var cs = doc.Descendants("add")
-                .Where(e => e.Attribute("connectionString") != null)
-                .Select(e => (string?)e.Attribute("connectionString") ?? "")
-                .FirstOrDefault(v => v.Contains("Initial Catalog", StringComparison.OrdinalIgnoreCase));
-            if (cs != null)
-                return ExtractInitialCatalog(cs);
-        }
-        catch { /* ignore malformed config */ }
-        return "";
+        var configPath = WebConfigConnStrings.ResolveConfigPath(physicalPath);
+        var entries = WebConfigConnStrings.Read(configPath);
+        return WebConfigConnStrings.PickPrimary(entries)?.Database ?? "";
     }
 
-    private static string ExtractInitialCatalog(string connStr)
+    /// <summary>Every connection string in this app's Web.config.</summary>
+    public static List<ConnStringEntry> ReadConnStringsFromWebConfig(string physicalPath)
+        => WebConfigConnStrings.Read(WebConfigConnStrings.ResolveConfigPath(physicalPath));
+
+    /// <summary>Points one connection string at a new server and/or database, verifying the write.
+    /// Only the named entry is touched — other connection strings in the same file keep their values.</summary>
+    public static ConnStringPatchResult SetConnStringInWebConfig(
+        string physicalPath,
+        ConnStringKind kind,
+        string entryName,
+        string? newDataSource,
+        string? newDatabase,
+        bool makeBackup = true)
     {
-        foreach (var part in connStr.Split(';'))
-        {
-            var kv = part.Trim().Split('=', 2);
-            if (kv.Length == 2 &&
-                kv[0].Trim().Equals("Initial Catalog", StringComparison.OrdinalIgnoreCase))
-                return kv[1].Trim();
-        }
-        return "";
+        var configPath = WebConfigConnStrings.ResolveConfigPath(physicalPath);
+        if (configPath == null)
+            return new ConnStringPatchResult { Error = $"No Web.config under {physicalPath}." };
+
+        return WebConfigConnStrings.Patch(
+            configPath, kind, entryName, newDataSource, newDatabase, makeBackup);
     }
 
-    /// <summary>
-    /// Replaces the Initial Catalog value in the connection string stored inside
-    /// the NHibernate property (and standard connectionStrings as fallback).
-    /// Returns true if the file was modified.
-    /// </summary>
-    public static bool SetDatabaseInWebConfig(string physicalPath, string newDatabase)
+    /// <summary>Points this app's primary connection string at <paramref name="newDatabase"/>.</summary>
+    public static ConnStringPatchResult SetDatabaseInWebConfig(
+        string physicalPath, string newDatabase, bool makeBackup = true)
     {
-        var configPath = Path.Combine(physicalPath, "Web.config");
-        if (!File.Exists(configPath)) return false;
+        var configPath = WebConfigConnStrings.ResolveConfigPath(physicalPath);
+        if (configPath == null)
+            return new ConnStringPatchResult { Error = $"No Web.config under {physicalPath}." };
 
-        var original = File.ReadAllText(configPath);
-        var updated = ReplaceInitialCatalog(original, newDatabase);
-        if (updated == original) return false;
+        var primary = WebConfigConnStrings.PickPrimary(WebConfigConnStrings.Read(configPath));
+        if (primary == null)
+            return new ConnStringPatchResult
+            {
+                Error = $"{Path.GetFileName(configPath)} holds no connection string to update."
+            };
 
-        File.WriteAllText(configPath, updated);
-        return true;
-    }
-
-    private static string ReplaceInitialCatalog(string configText, string newDb)
-    {
-        // Replace "Initial Catalog=<anything or empty>" (case-insensitive)
-        // Uses * instead of + to handle empty values like "Initial Catalog="
-        var replaced = System.Text.RegularExpressions.Regex.Replace(
-            configText,
-            @"(?i)(Initial\s+Catalog\s*=\s*)([^;""<]*)",
-            m => m.Groups[1].Value + newDb);
-
-        // If no match found (key doesn't exist at all in connection string),
-        // try to append to the end of each connection string value
-        if (replaced == configText &&
-            !configText.Contains("Initial Catalog", StringComparison.OrdinalIgnoreCase))
-        {
-            replaced = System.Text.RegularExpressions.Regex.Replace(
-                configText,
-                @"(connection\.connection_string[^>]*>|connectionString\s*=\s*""[^""]*)",
-                m =>
-                {
-                    var val = m.Value;
-                    // Append before closing tag or quote
-                    if (val.TrimEnd().EndsWith(";", StringComparison.Ordinal))
-                        return val + $"Initial Catalog={newDb};";
-                    return val + $";Initial Catalog={newDb}";
-                },
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        }
-
-        return replaced;
+        return WebConfigConnStrings.Patch(
+            configPath, primary.Kind, primary.Name, null, newDatabase, makeBackup);
     }
 
     // ── Physical path ─────────────────────────────────────────────────────────
@@ -171,10 +151,34 @@ public static class IisHelper
         await RunProcessAsync("iisreset.exe", "/start", timeoutMs: 30_000);
     }
 
+    /// <summary>Recycles one pool. Uses the full appcmd path — inetsrv is not on PATH by default.</summary>
     public static async Task RecycleAppPoolAsync(string poolName)
     {
-        await RunProcessAsync("appcmd.exe",
+        if (!File.Exists(AppCmd))
+            throw new FileNotFoundException("appcmd.exe not found — IIS management tools are not installed.", AppCmd);
+
+        await RunProcessAsync(AppCmd,
             $"recycle apppool /apppool.name:\"{poolName}\"", timeoutMs: 30_000);
+    }
+
+    /// <summary>Recycles each distinct pool, reporting per-pool outcome instead of aborting on the first failure.</summary>
+    public static async Task<List<string>> RecycleAppPoolsAsync(IEnumerable<string> poolNames)
+    {
+        var log = new List<string>();
+        foreach (var pool in poolNames.Where(p => !string.IsNullOrWhiteSpace(p))
+                                      .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await RecycleAppPoolAsync(pool);
+                log.Add($"✔ Recycled app pool '{pool}'.");
+            }
+            catch (Exception ex)
+            {
+                log.Add($"✘ App pool '{pool}': {ex.Message}");
+            }
+        }
+        return log;
     }
 
     private static Task RunProcessAsync(string exe, string args, int timeoutMs)

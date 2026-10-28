@@ -8,6 +8,7 @@ partial class UnzipWorkbenchForm
     private System.Windows.Forms.Panel        pnlTop;
     private System.Windows.Forms.Label        lblZipFile;
     private System.Windows.Forms.TextBox      txtZipPath;
+    private System.Windows.Forms.Button       btnFromUrl;
     private System.Windows.Forms.Button       btnBrowseZip;
     private System.Windows.Forms.Button       btnToggleSettings;
     private System.Windows.Forms.Label        lblDb;
@@ -22,6 +23,7 @@ partial class UnzipWorkbenchForm
     private System.Windows.Forms.DataGridViewTextBoxColumn colDest;
     private System.Windows.Forms.Button                    btnAddRow;
     private System.Windows.Forms.Button                    btnDeleteRow;
+    private System.Windows.Forms.Button                    btnClearDownloads;
     private System.Windows.Forms.Button                    btnSaveConfig;
     private System.Windows.Forms.Button                    btnCloseSettings;
 
@@ -53,6 +55,7 @@ partial class UnzipWorkbenchForm
         pnlTop = new Panel();
         lblZipFile = new Label();
         txtZipPath = new TextBox();
+        btnFromUrl = new Button();
         btnBrowseZip = new Button();
         btnToggleSettings = new Button();
         lblDb = new Label();
@@ -65,6 +68,7 @@ partial class UnzipWorkbenchForm
         colDest = new DataGridViewTextBoxColumn();
         btnAddRow = new Button();
         btnDeleteRow = new Button();
+        btnClearDownloads = new Button();
         btnSaveConfig = new Button();
         btnCloseSettings = new Button();
         splitMain = new SplitContainer();
@@ -97,6 +101,7 @@ partial class UnzipWorkbenchForm
         // 
         pnlTop.Controls.Add(lblZipFile);
         pnlTop.Controls.Add(txtZipPath);
+        pnlTop.Controls.Add(btnFromUrl);
         pnlTop.Controls.Add(btnBrowseZip);
         pnlTop.Controls.Add(btnToggleSettings);
         pnlTop.Controls.Add(lblDb);
@@ -123,18 +128,28 @@ partial class UnzipWorkbenchForm
         txtZipPath.Anchor = AnchorStyles.Left | AnchorStyles.Right;
         txtZipPath.Location = new Point(68, 8);
         txtZipPath.Name = "txtZipPath";
-        txtZipPath.PlaceholderText = "Select .zip file...";
-        txtZipPath.Size = new Size(507, 23);
+        txtZipPath.PlaceholderText = "Select a .zip file, or paste a http:// URL...";
+        txtZipPath.Size = new Size(411, 23);
         txtZipPath.TabIndex = 1;
         txtZipPath.TextChanged += txtZipPath_TextChanged;
-        // 
+        //
+        // btnFromUrl
+        //
+        btnFromUrl.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnFromUrl.Location = new Point(483, 8);
+        btnFromUrl.Name = "btnFromUrl";
+        btnFromUrl.Size = new Size(94, 26);
+        btnFromUrl.TabIndex = 2;
+        btnFromUrl.Text = "🌐 URL...";
+        btnFromUrl.Click += btnFromUrl_Click;
+        //
         // btnBrowseZip
-        // 
+        //
         btnBrowseZip.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         btnBrowseZip.Location = new Point(581, 8);
         btnBrowseZip.Name = "btnBrowseZip";
         btnBrowseZip.Size = new Size(92, 26);
-        btnBrowseZip.TabIndex = 2;
+        btnBrowseZip.TabIndex = 3;
         btnBrowseZip.Text = "Select file...";
         btnBrowseZip.Click += btnBrowseZip_Click;
         // 
@@ -189,6 +204,7 @@ partial class UnzipWorkbenchForm
         pnlSettings.Controls.Add(dgvMappings);
         pnlSettings.Controls.Add(btnAddRow);
         pnlSettings.Controls.Add(btnDeleteRow);
+        pnlSettings.Controls.Add(btnClearDownloads);
         pnlSettings.Controls.Add(btnSaveConfig);
         pnlSettings.Controls.Add(btnCloseSettings);
         pnlSettings.Location = new Point(0, 60);
@@ -254,9 +270,18 @@ partial class UnzipWorkbenchForm
         btnDeleteRow.TabIndex = 3;
         btnDeleteRow.Text = "- Delete Row";
         btnDeleteRow.Click += btnDeleteRow_Click;
-        // 
+        //
+        // btnClearDownloads
+        //
+        btnClearDownloads.Location = new Point(210, 226);
+        btnClearDownloads.Name = "btnClearDownloads";
+        btnClearDownloads.Size = new Size(210, 28);
+        btnClearDownloads.TabIndex = 4;
+        btnClearDownloads.Text = "🗑 Clear downloads";
+        btnClearDownloads.Click += btnClearDownloads_Click;
+        //
         // btnSaveConfig
-        // 
+        //
         btnSaveConfig.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         btnSaveConfig.BackColor = Color.FromArgb(0, 120, 212);
         btnSaveConfig.FlatStyle = FlatStyle.Flat;
@@ -265,7 +290,7 @@ partial class UnzipWorkbenchForm
         btnSaveConfig.Location = new Point(678, 226);
         btnSaveConfig.Name = "btnSaveConfig";
         btnSaveConfig.Size = new Size(90, 28);
-        btnSaveConfig.TabIndex = 4;
+        btnSaveConfig.TabIndex = 5;
         btnSaveConfig.Text = "💾 Save";
         btnSaveConfig.UseVisualStyleBackColor = false;
         btnSaveConfig.Click += btnSaveConfig_Click;
@@ -276,7 +301,7 @@ partial class UnzipWorkbenchForm
         btnCloseSettings.Location = new Point(774, 226);
         btnCloseSettings.Name = "btnCloseSettings";
         btnCloseSettings.Size = new Size(96, 28);
-        btnCloseSettings.TabIndex = 5;
+        btnCloseSettings.TabIndex = 6;
         btnCloseSettings.Text = "✕ Close";
         btnCloseSettings.Click += btnCloseSettings_Click;
         // 

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace BLogicDevTool;
 
 public class BuildConfig
@@ -8,7 +10,10 @@ public class BuildConfig
     public string OutputFolderName { get; set; } = "";
     public List<string> ExtraFolders { get; set; } = new();
     public List<string> RedistributeTo { get; set; } = new();
-    public bool FilterByGit { get; set; } = false;
+    /// <summary>Legacy per-config flag — read only to migrate into
+    /// <see cref="BuildSettings.FilterByGit"/>; never written back.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? FilterByGit { get; set; }
 }
 
 public class BuildSettings
@@ -29,9 +34,13 @@ public class BuildSettings
     /// is ignored in this mode.</summary>
     public bool IncludeUncommitted { get; set; } = false;
 
-    /// <summary>When true, the destination output folder(s) of the configs being built
-    /// (and their redistribute targets) are emptied once before the build run, so stale
-    /// artifacts from previous builds don't leak into the release.</summary>
+    /// <summary>Shared by all configs: build/copy only the projects touched by the
+    /// git diff (base vs compare). Null = not yet migrated from per-config flags.</summary>
+    public bool? FilterByGit { get; set; }
+
+    /// <summary>Full rebuild: empties the destination folder(s) AND runs a solution Clean.
+    /// Off means an incremental build, which is the difference between seconds and
+    /// recompiling every project on every run.</summary>
     public bool CleanOutputFirst { get; set; } = true;
 
     /// <summary>When true, after a successful build run the whole OutputBasePath
@@ -56,6 +65,7 @@ public class BuildSettings
         CopyExtensions = new() { ".dll", ".exe", ".resources.dll" },
         GitBaseBranch = "origin/develop",
         GitCompareBranch = "HEAD",
+        FilterByGit = true,
         Configs = new()
         {
             new BuildConfig
@@ -65,7 +75,6 @@ public class BuildSettings
                 BuildEngine = "msbuild",
                 OutputFolderName = "Common",
                 RedistributeTo = new() { "Server", "POS", "BO" },
-                FilterByGit = true,
             },
             new BuildConfig
             {
@@ -74,7 +83,6 @@ public class BuildSettings
                 BuildEngine = "msbuild",
                 OutputFolderName = "Server/bin",
                 ExtraFolders = new() { "Language", "Templates" },
-                FilterByGit = true,
             },
             new BuildConfig
             {
@@ -83,7 +91,6 @@ public class BuildSettings
                 BuildEngine = "msbuild",
                 OutputFolderName = "POS",
                 ExtraFolders = new() { "Language", "Templates" },
-                FilterByGit = true,
             },
             new BuildConfig
             {
@@ -92,7 +99,6 @@ public class BuildSettings
                 BuildEngine = "msbuild",
                 OutputFolderName = "BO",
                 ExtraFolders = new() { "Language", "Templates" },
-                FilterByGit = true,
             },
             new BuildConfig
             {
@@ -100,7 +106,6 @@ public class BuildSettings
                 SolutionPath = @"D:\BLOGIC\BLogicConnector\BLogicConnector.sln",
                 BuildEngine = "msbuild",
                 OutputFolderName = "BLogicConnector",
-                FilterByGit = false,
             },
         },
     };

@@ -19,8 +19,10 @@ public partial class BuildReleaseForm : UserControl
     private string _gitBaseBranch = "dev";
     private string _gitCompareBranch = "HEAD";
     private bool _includeUncommitted = false;
+    private bool _filterByGit = true;
     private bool _zipAfterBuild = true;
     private bool _cleanOutputFirst = true;
+    private readonly ToolTip _cleanTip = new();
     private List<BuildConfig> _configs = new();
     private int _selectedIndex = -1;
     private bool _suppressDetailEvents = false;
@@ -30,6 +32,14 @@ public partial class BuildReleaseForm : UserControl
     public BuildReleaseForm()
     {
         InitializeComponent();
+        _log = new RichLogBuffer(txtLog, LineColor);
+        _cleanTip.SetToolTip(chkCleanFirst,
+            "On: wipe the output folders AND run a solution Clean (full rebuild).\n"
+            + "Off: incremental build — MSBuild skips what is already up to date.");
+        _cleanTip.SetToolTip(chkFilterGit,
+            "Applies to every config: build/copy only projects changed between Git Base and Git Compare.\n"
+            + "Repo is auto-detected from each solution path.");
+        Disposed += (_, _) => { _log.Dispose(); _cleanTip.Dispose(); };
         cboConfig.Items.AddRange(new object[] { "Release", "Debug" });
         cboConfig.SelectedIndex = 0;
         cboEngine.Items.AddRange(new object[]
@@ -67,6 +77,7 @@ public partial class BuildReleaseForm : UserControl
         _zipAfterBuild = settings.ZipAfterBuild;
         _cleanOutputFirst = settings.CleanOutputFirst;
         _includeUncommitted = settings.IncludeUncommitted;
+        _filterByGit = settings.FilterByGit ?? true;
         _suppressGlobalEvents = true;
         txtGlobalOutBase.Text = _outputBasePath;
         cboConfig.SelectedItem = _configuration;
@@ -75,6 +86,7 @@ public partial class BuildReleaseForm : UserControl
         txtGitBase.Text = _gitBaseBranch;
         txtGitCompare.Text = _gitCompareBranch;
         chkIncludeUncommitted.Checked = _includeUncommitted;
+        chkFilterGit.Checked = _filterByGit;
         chkZipOutput.Checked = _zipAfterBuild;
         chkCleanFirst.Checked = _cleanOutputFirst;
         _suppressGlobalEvents = false;
@@ -121,6 +133,7 @@ public partial class BuildReleaseForm : UserControl
             GitBaseBranch = _gitBaseBranch,
             GitCompareBranch = _gitCompareBranch,
             IncludeUncommitted = _includeUncommitted,
+            FilterByGit = _filterByGit,
             ZipAfterBuild = _zipAfterBuild,
             CleanOutputFirst = _cleanOutputFirst,
             Configs = _configs
@@ -337,6 +350,12 @@ public partial class BuildReleaseForm : UserControl
         _includeUncommitted = chkIncludeUncommitted.Checked;
     }
 
+    private void chkFilterGit_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (_suppressGlobalEvents) return;
+        _filterByGit = chkFilterGit.Checked;
+    }
+
     private void btnGlobalBrowseOutBase_Click(object? sender, EventArgs e)
     {
         using var dlg = new FolderBrowserDialog
@@ -346,6 +365,18 @@ public partial class BuildReleaseForm : UserControl
         };
         if (dlg.ShowDialog() == DialogResult.OK)
             txtGlobalOutBase.Text = dlg.SelectedPath;
+    }
+
+    private void btnOpenOutBase_Click(object? sender, EventArgs e)
+    {
+        var path = _outputBasePath;
+        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+        {
+            MessageBox.Show($"Build folder does not exist yet:\n{_outputBasePath}",
+                "Open Folder", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        System.Diagnostics.Process.Start("explorer.exe", $"\"{path}\"");
     }
 
     // ── List management ──────────────────────────────────────────────────────
@@ -437,7 +468,6 @@ public partial class BuildReleaseForm : UserControl
                 txtOutFolder.Text = "";
                 txtExtraFolders.Text = "";
                 btnRedistribute.Text = "(none)";
-                chkFilterGit.Checked = false;
                 lblOutPreview.Text = "";
                 UpdateDetailEnabled();
                 return;
@@ -450,7 +480,6 @@ public partial class BuildReleaseForm : UserControl
             txtOutFolder.Text = c.OutputFolderName;
             txtExtraFolders.Text = string.Join(", ", c.ExtraFolders ?? new List<string>());
             UpdateRedistributeButtonText();
-            chkFilterGit.Checked = c.FilterByGit;
             UpdatePreview();
             UpdateDetailEnabled();
         }
@@ -468,7 +497,6 @@ public partial class BuildReleaseForm : UserControl
         c.BuildEngine = EngineFromDisplay(cboEngine.SelectedItem?.ToString());
         c.OutputFolderName = txtOutFolder.Text.Trim();
         c.ExtraFolders = ParseExtraFolders(txtExtraFolders.Text);
-        c.FilterByGit = chkFilterGit.Checked;
 
         UpdatePreview();
     }
@@ -504,16 +532,15 @@ public partial class BuildReleaseForm : UserControl
         txtOutFolder.Enabled = on;
         txtExtraFolders.Enabled = on;
         btnRedistribute.Enabled = on;
-        chkFilterGit.Enabled = on;
         btnBrowseSln.Enabled = on;
         btnSaveConfig.Enabled = !_isBusy;
 
         txtGlobalOutBase.Enabled = !_isBusy;
-        btnGlobalBrowseOutBase.Enabled = !_isBusy;
-        cboConfig.Enabled = !_isBusy;
+        btnGlobalBrowseOutBase.Enabled = !_isBusy;        cboConfig.Enabled = !_isBusy;
         btnExtensions.Enabled = !_isBusy;
         txtGitBase.Enabled = !_isBusy;
         txtGitCompare.Enabled = !_isBusy;
+        chkFilterGit.Enabled = !_isBusy;
         chkIncludeUncommitted.Enabled = !_isBusy;
     }
 
@@ -579,11 +606,6 @@ public partial class BuildReleaseForm : UserControl
     private void cboEngine_SelectedIndexChanged(object? sender, EventArgs e) => SaveDetailToConfig();
     private void txtOutFolder_TextChanged(object? sender, EventArgs e) => SaveDetailToConfig();
     private void txtExtraFolders_TextChanged(object? sender, EventArgs e) => SaveDetailToConfig();
-    private void chkFilterGit_CheckedChanged(object? sender, EventArgs e)
-    {
-        SaveDetailToConfig();
-        UpdateDetailEnabled();
-    }
 
     // ── Browse buttons ──
 
@@ -661,7 +683,7 @@ public partial class BuildReleaseForm : UserControl
         AppendLog($"  Solution contains {projects.Count} project(s).");
 
         List<string> targetProjects;
-        if (c.FilterByGit)
+        if (_filterByGit)
         {
             var (owning, _) = await ResolveAffectedProjectsAsync(c, projects);
             if (owning == null) return;
@@ -730,7 +752,7 @@ public partial class BuildReleaseForm : UserControl
                 await Task.Run(() => CleanDestinations(targets));
 
             int idx = 0;
-            int failures = 0;
+            string? failedName = null;
             foreach (var c in targets)
             {
                 idx++;
@@ -740,28 +762,35 @@ public partial class BuildReleaseForm : UserControl
                 try
                 {
                     var ok = await BuildOneAsync(c);
-                    if (!ok) failures++;
+                    if (!ok) { failedName = c.Name; break; }
                 }
                 catch (Exception ex)
                 {
-                    failures++;
+                    failedName = c.Name;
                     AppendLog($"✘ Unhandled: {ex.Message}");
+                    break;
                 }
             }
 
-            if (failures == 0)
+            if (failedName == null)
             {
                 AppendLog($"\n✔ All {targets.Count} build(s) completed.");
                 if (_zipAfterBuild)
                     ZipOutputBase();
+                ShowResultBanner(true, new List<string>());
                 SetStatus("✔ Build complete.", Color.DarkGreen);
             }
             else
             {
-                AppendLog($"\n⚠ Completed with {failures}/{targets.Count} failure(s).");
+                // Fail-fast: stop at the first failing config; report which ones never ran.
+                int remaining = targets.Count - idx;
+                AppendLog($"\n✘ Build stopped at [{idx}/{targets.Count}] '{failedName}' — error detected.");
+                if (remaining > 0)
+                    AppendLog($"  ⏭ {remaining} remaining config(s) not built.");
                 if (_zipAfterBuild)
-                    AppendLog($"  ⏭ Skipping zip — build had failure(s).");
-                SetStatus($"⚠ {failures} failed.", Color.DarkOrange);
+                    AppendLog($"  ⏭ Skipping zip — build failed.");
+                ShowResultBanner(false, new List<string> { failedName });
+                SetStatus($"✘ Build stopped: '{failedName}' failed.", Color.DarkRed);
             }
         }
         finally
@@ -789,7 +818,7 @@ public partial class BuildReleaseForm : UserControl
 
         List<string> targetProjects;
         HashSet<string>? extraFolderFilter = null;
-        if (c.FilterByGit)
+        if (_filterByGit)
         {
             var (owning, changedFiles) = await ResolveAffectedProjectsAsync(c, projects);
             if (owning == null) return false;
@@ -819,7 +848,8 @@ public partial class BuildReleaseForm : UserControl
         {
             (exit, fullOutput) = await BuildHelper.BuildSolutionAsync(
                 c.SolutionPath, _configuration, c.BuildEngine,
-                line => AppendLog($"    {line}"));
+                cleanSolution: _cleanOutputFirst,
+                logger: line => AppendLog($"    {line}"));
         }
         catch (Exception ex)
         {
@@ -838,6 +868,7 @@ public partial class BuildReleaseForm : UserControl
         if (exit != 0)
         {
             AppendLog($"  ✘ Build failed (exit {exit}).");
+            EchoFirstErrors(fullOutput);
             try
             {
                 var failPath = BuildHelper.SaveBuildLog(c, _configuration, destPath, exit, fullOutput);
@@ -1130,17 +1161,77 @@ public partial class BuildReleaseForm : UserControl
         lblStatus.ForeColor = color;
     }
 
-    private void AppendLog(string text)
+    private static readonly Font _bannerFont = new("Consolas", 18F, FontStyle.Bold);
+
+    private readonly RichLogBuffer _log;
+
+    /// <summary>No marshalling here on purpose: this runs on MSBuild's stdout reader thread.</summary>
+    private void AppendLog(string text) => _log.Append(text + Environment.NewLine);
+
+    /// <summary>Echoes the first compiler error lines in red, so the failure point is
+    /// visible without opening the saved build log.</summary>
+    private void EchoFirstErrors(string? output, int max = 6)
     {
-        if (InvokeRequired) { Invoke(() => AppendLog(text)); return; }
-        txtLog.AppendText(text + Environment.NewLine);
-        txtLog.SelectionStart = txtLog.Text.Length;
-        txtLog.ScrollToCaret();
+        if (string.IsNullOrEmpty(output)) return;
+        var errors = output
+            .Replace("\r", "")
+            .Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => l.Contains(": error ", StringComparison.OrdinalIgnoreCase))
+            .Distinct()
+            .ToList();
+        if (errors.Count == 0) return;
+
+        AppendLog($"  ✘ {errors.Count} error(s) — first {Math.Min(max, errors.Count)}:");
+        foreach (var e in errors.Take(max))
+            AppendLog($"    → {e}");   // contains ": error " → shown red by LineColor
+        if (errors.Count > max)
+            AppendLog($"    … +{errors.Count - max} more (see saved build log)");
     }
 
-    private void ClearLog()
+    private static Color LineColor(string message)
     {
-        if (InvokeRequired) { Invoke(ClearLog); return; }
-        txtLog.Clear();
+        var t = message.TrimStart();
+        var red = Color.FromArgb(255, 110, 110);
+        if (t.StartsWith("✔")) return Color.LightGreen;
+        if (t.StartsWith("✘")) return red;
+        if (t.StartsWith("⚠") || t.StartsWith("⏭")) return Color.Orange;
+        // MSBuild / compiler output
+        if (t.Contains(": error ", StringComparison.OrdinalIgnoreCase)
+            || t.Contains("Build FAILED", StringComparison.OrdinalIgnoreCase)) return red;
+        if (t.Contains(": warning ", StringComparison.OrdinalIgnoreCase)) return Color.Orange;
+        if (t.Contains("Build succeeded", StringComparison.OrdinalIgnoreCase)) return Color.LightGreen;
+        if (t.StartsWith("▶") || t.StartsWith("═") || t.StartsWith("🧹") || t.StartsWith("📄"))
+            return Color.FromArgb(120, 180, 255);
+        return Color.Gainsboro;
     }
+
+    private void AppendColored(string text, Color color, Font? font)
+        => _log.Append(text, color, font);
+
+    /// <summary>Big result banner: green COMPLETE on success, or red FAILED listing
+    /// which configuration(s) failed so the outcome is obvious at a glance.</summary>
+    private void ShowResultBanner(bool success, IReadOnlyList<string> failedConfigs)
+    {
+        AppendColored(Environment.NewLine, Color.Gainsboro, null);
+        if (success)
+        {
+            AppendColored("  ✔  COMPLETE" + Environment.NewLine, Color.LimeGreen, _bannerFont);
+        }
+        else
+        {
+            AppendColored("  ✘  FAILED" + Environment.NewLine, Color.Red, _bannerFont);
+            if (failedConfigs.Count > 0)
+            {
+                AppendColored($"  Failed config(s): {failedConfigs.Count}" + Environment.NewLine,
+                    Color.FromArgb(255, 110, 110), null);
+                foreach (var name in failedConfigs)
+                    AppendColored($"   • {name}  — see its build log above / build_logs folder"
+                        + Environment.NewLine, Color.FromArgb(255, 110, 110), null);
+            }
+        }
+        _log.Flush();   // the banner must land after every queued build line
+    }
+
+    private void ClearLog() => _log.Clear();
 }

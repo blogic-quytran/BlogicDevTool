@@ -4,44 +4,23 @@ namespace BLogicDevTool;
 
 public static class BuildConfigStore
 {
-    private static readonly string StorePath = Path.Combine(
-        AppContext.BaseDirectory,
-        "build_config.json");
-
-    private static readonly string LegacyStorePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "BLogicDevTool",
-        "build_config.json");
-
-    private static readonly string DefaultTemplatePath = Path.Combine(
-        AppContext.BaseDirectory,
-        "default_build_config.json");
-
-    private static readonly JsonSerializerOptions _jsonOpts =
-        new() { WriteIndented = true };
-
     public static BuildSettings Load()
     {
-        var path = File.Exists(StorePath) ? StorePath
-                 : File.Exists(LegacyStorePath) ? LegacyStorePath
-                 : null;
-        if (path == null)
-        {
-            if (File.Exists(DefaultTemplatePath))
-            {
-                try
-                {
-                    var templateJson = File.ReadAllText(DefaultTemplatePath);
-                    var fromTemplate = JsonSerializer.Deserialize<BuildSettings>(templateJson);
-                    if (fromTemplate != null) return fromTemplate;
-                }
-                catch { /* fall through to hardcoded default */ }
-            }
-            return BuildSettings.CreateDefault();
-        }
+        var s = AppConfigStore.Get(c => c.Build, (c, v) => c.Build = v, BuildSettings.CreateDefault);
+        // Filter-by-git used to be per config; lift it to the shared setting once.
+        s.FilterByGit ??= s.Configs.Any(c => c.FilterByGit == true);
+        foreach (var c in s.Configs) c.FilterByGit = null;
+        return s;
+    }
+
+    public static void Save(BuildSettings settings) =>
+        AppConfigStore.Update(c => c.Build = settings);
+
+    /// <summary>Reads an old build_config.json, including the pre-BuildSettings array format.</summary>
+    internal static BuildSettings ParseLegacy(string json)
+    {
         try
         {
-            var json = File.ReadAllText(path);
             var trimmed = json.TrimStart();
             BuildSettings settings;
             JsonElement rootElement;
@@ -142,11 +121,5 @@ public static class BuildConfigStore
                 }
             }
         }
-    }
-
-    public static void Save(BuildSettings settings)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(StorePath)!);
-        File.WriteAllText(StorePath, JsonSerializer.Serialize(settings, _jsonOpts));
     }
 }

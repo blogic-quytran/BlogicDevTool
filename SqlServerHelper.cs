@@ -45,6 +45,39 @@ public class SqlServerHelper
         return list;
     }
 
+    /// <summary>Schema-qualified tables and views of a database, for synonym generation.</summary>
+    public async Task<List<(string Schema, string Name)>> GetTablesAndViewsAsync(string databaseName)
+    {
+        var list = new List<(string, string)>();
+        var builder = new SqlConnectionStringBuilder(_connectionString)
+        {
+            InitialCatalog = databaseName
+        };
+        using var conn = new SqlConnection(builder.ConnectionString);
+        await conn.OpenAsync();
+        using var cmd = new SqlCommand(@"
+SELECT s.name AS SchemaName, o.name AS ObjectName
+FROM sys.objects o WITH (NOLOCK)
+JOIN sys.schemas s WITH (NOLOCK) ON s.schema_id = o.schema_id
+WHERE o.type IN ('U', 'V') AND o.is_ms_shipped = 0
+ORDER BY s.name, o.name", conn);
+        using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            list.Add((reader.GetString(0), reader.GetString(1)));
+        return list;
+    }
+
+    /// <summary>True when a database with this name exists and is online.</summary>
+    public async Task<bool> DatabaseExistsAsync(string databaseName)
+    {
+        using var conn = new SqlConnection(_connectionString);
+        await conn.OpenAsync();
+        using var cmd = new SqlCommand(
+            "SELECT COUNT(*) FROM sys.databases WITH (NOLOCK) WHERE name = @n AND state_desc = 'ONLINE'", conn);
+        cmd.Parameters.AddWithValue("@n", databaseName);
+        return Convert.ToInt32(await cmd.ExecuteScalarAsync()) > 0;
+    }
+
     public async Task<string> GetDefaultDataPathAsync()
     {
         using var conn = new SqlConnection(_connectionString);
@@ -77,15 +110,11 @@ public class SqlServerHelper
 
     private static async Task ExecuteBatchesOnConnectionAsync(SqlConnection conn, string sql)
     {
-        // Split on GO statements
-        var batches = System.Text.RegularExpressions.Regex.Split(
-            sql, @"^\s*GO\s*$",
-            System.Text.RegularExpressions.RegexOptions.Multiline |
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-        foreach (var batch in batches)
+        // One splitter for both run paths, so the same .sql file batches identically here
+        // and in ExecuteSqlBatchesContinueOnErrorAsync.
+        foreach (var (text, _) in SplitBatchesWithLines(sql))
         {
-            var trimmed = batch.Trim();
+            var trimmed = text.Trim();
             if (string.IsNullOrWhiteSpace(trimmed)) continue;
             using var cmd = new SqlCommand(trimmed, conn)
             {
@@ -93,6 +122,107 @@ public class SqlServerHelper
             };
             await cmd.ExecuteNonQueryAsync();
         }
+    }
+
+    /// <summary>Runs a script the way SSMS does: a failing batch is logged (Msg/Level/State/
+    /// Line) and the rest still run. Stops early only if the failed batch switched DB
+    /// context, since everything after it would hit the wrong database.</summary>
+    public async Task<SqlBatchRunResult> ExecuteSqlBatchesContinueOnErrorAsync(
+        string sql, string databaseName, Action<string>? log = null)
+    {
+        var builder = new SqlConnectionStringBuilder(_connectionString)
+        {
+            InitialCatalog = databaseName
+        };
+        using var conn = new SqlConnection(builder.ConnectionString);
+        await conn.OpenAsync();
+
+        var result = new SqlBatchRunResult();
+        foreach (var (text, startLine) in SplitBatchesWithLines(sql))
+        {
+            var trimmed = text.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed)) continue;
+            result.TotalBatches++;
+            var failed = false;
+            using var cmd = new SqlCommand(trimmed, conn) { CommandTimeout = 600 };
+            try
+            {
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (SqlException ex)
+            {
+                foreach (SqlError err in ex.Errors)
+                {
+                    // Class < 11 are pure informational messages, not errors.
+                    if (err.Class < 11) continue;
+                    // err.LineNumber is relative to the batch — offset it back to the
+                    // line in the original script so it matches what the user sees.
+                    var absLine = startLine + Math.Max(0, err.LineNumber - 1);
+                    var line = $"Msg {err.Number}, Level {err.Class}, State {err.State}, Line {absLine}: {err.Message}";
+                    result.Errors.Add(line);
+                    log?.Invoke("  ✘ " + line);
+                    failed = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add(ex.Message);
+                log?.Invoke("  ✘ " + ex.Message);
+                failed = true;
+            }
+
+            if (!failed) continue;      // nothing above informational level → not a failure
+            result.FailedBatches++;
+
+            // DB context lives on the connection: if the batch that switched it failed, every
+            // later batch would run against the previous database. Stop instead.
+            if (UseStatementRegex.IsMatch(trimmed))
+            {
+                result.Aborted = true;
+                result.AbortReason = "a USE (database context) statement failed";
+                log?.Invoke("  ✘ Stopped: that batch switches database context — running the "
+                            + "rest would target the wrong database.");
+                break;
+            }
+        }
+        return result;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex UseStatementRegex = new(
+        @"^\s*USE\s+", System.Text.RegularExpressions.RegexOptions.Multiline
+                       | System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                       | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static readonly System.Text.RegularExpressions.Regex GoLineRegex = new(
+        @"^\s*GO\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                       | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>Splits on standalone GO lines, tracking each batch's 1-based start line so
+    /// error line numbers can be reported against the whole file.</summary>
+    private static List<(string Text, int StartLine)> SplitBatchesWithLines(string sql)
+    {
+        var result = new List<(string, int)>();
+        var sb = new System.Text.StringBuilder();
+        int batchStartLine = 1;
+        int currentLine = 0;
+        foreach (var raw in sql.Split('\n'))
+        {
+            currentLine++;
+            var lineText = raw.TrimEnd('\r');
+            if (GoLineRegex.IsMatch(lineText))
+            {
+                result.Add((sb.ToString(), batchStartLine));
+                sb.Clear();
+                batchStartLine = currentLine + 1;
+            }
+            else
+            {
+                sb.Append(lineText).Append('\n');
+            }
+        }
+        if (sb.Length > 0)
+            result.Add((sb.ToString(), batchStartLine));
+        return result;
     }
 
     // ── SQL Server info ───────────────────────────────────────────────────
@@ -171,16 +301,15 @@ ORDER BY p.name;";
         using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync();
 
-        // Parameter binding is used for the password to prevent injection
-        const string sql = @"
+        // ALTER LOGIN can't be parameterized — embed the password as an escaped literal.
+        var sql = $@"
 USE [master];
-ALTER LOGIN [sa] WITH PASSWORD = @pwd, CHECK_POLICY = ON, CHECK_EXPIRATION = OFF;
+ALTER LOGIN [sa] WITH PASSWORD = {QuoteLiteral(saPassword)}, CHECK_POLICY = ON, CHECK_EXPIRATION = OFF;
 ALTER LOGIN [sa] ENABLE;
 IF IS_SRVROLEMEMBER('sysadmin', 'sa') = 0
     ALTER SERVER ROLE [sysadmin] ADD MEMBER [sa];";
 
         using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 30 };
-        cmd.Parameters.Add("@pwd", System.Data.SqlDbType.NVarChar, 128).Value = saPassword;
         await cmd.ExecuteNonQueryAsync();
     }
 
@@ -193,9 +322,9 @@ IF IS_SRVROLEMEMBER('sysadmin', 'sa') = 0
         await conn.OpenAsync();
 
         // CREATE LOGIN does not support parameterized name/password — use quoted identifier
-        var sql = $"CREATE LOGIN [{EscapeIdentifier(loginName)}] WITH PASSWORD = @pwd, CHECK_POLICY = ON, CHECK_EXPIRATION = OFF;";
+        // for the name and an escaped string literal for the password.
+        var sql = $"CREATE LOGIN [{EscapeIdentifier(loginName)}] WITH PASSWORD = {QuoteLiteral(password)}, CHECK_POLICY = ON, CHECK_EXPIRATION = OFF;";
         using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 30 };
-        cmd.Parameters.Add("@pwd", System.Data.SqlDbType.NVarChar, 128).Value = password;
         await cmd.ExecuteNonQueryAsync();
 
         if (isSysAdmin)
@@ -241,9 +370,9 @@ IF IS_SRVROLEMEMBER('sysadmin', 'sa') = 0
         using var conn = new SqlConnection(_connectionString);
         await conn.OpenAsync();
 
-        var sql = $"ALTER LOGIN [{EscapeIdentifier(loginName)}] WITH PASSWORD = @pwd, CHECK_POLICY = ON, CHECK_EXPIRATION = OFF;";
+        // ALTER LOGIN can't be parameterized — embed the password as an escaped literal.
+        var sql = $"ALTER LOGIN [{EscapeIdentifier(loginName)}] WITH PASSWORD = {QuoteLiteral(newPassword)}, CHECK_POLICY = ON, CHECK_EXPIRATION = OFF;";
         using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 30 };
-        cmd.Parameters.Add("@pwd", System.Data.SqlDbType.NVarChar, 128).Value = newPassword;
         await cmd.ExecuteNonQueryAsync();
     }
 
@@ -261,6 +390,30 @@ IF IS_SRVROLEMEMBER('sysadmin', 'sa') = 0
         await cmd.ExecuteNonQueryAsync();
     }
 
+    /// <summary>Frees a DB left in SINGLE_USER by a half-done restore, so a retry isn't
+    /// blocked by "a user is currently connected". Never throws.</summary>
+    public async Task TrySetMultiUserAsync(string databaseName)
+    {
+        try
+        {
+            var builder = new SqlConnectionStringBuilder(_connectionString)
+            {
+                InitialCatalog = "master"
+            };
+            using var conn = new SqlConnection(builder.ConnectionString);
+            await conn.OpenAsync();
+            // QuoteLiteral already emits the N prefix — do not add a second one, or the
+            // statement becomes NN'db' and fails with Msg 102 before it can recover anything.
+            var sql =
+                $"IF DB_ID({QuoteLiteral(databaseName)}) IS NOT NULL " +
+                $"AND DATABASEPROPERTYEX({QuoteLiteral(databaseName)}, 'UserAccess') = 'SINGLE_USER' " +
+                $"ALTER DATABASE [{EscapeIdentifier(databaseName)}] SET MULTI_USER WITH ROLLBACK IMMEDIATE;";
+            using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 30 };
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch { /* best effort — recovery must never mask the original error */ }
+    }
+
     // ── Security helpers ──────────────────────────────────────────────────
 
     /// <summary>Validates that a login name contains only safe characters.</summary>
@@ -276,4 +429,20 @@ IF IS_SRVROLEMEMBER('sysadmin', 'sa') = 0
 
     /// <summary>Escapes a SQL identifier by doubling any closing bracket.</summary>
     private static string EscapeIdentifier(string name) => name.Replace("]", "]]");
+
+    /// <summary>Quotes a value as an N'...' literal for CREATE/ALTER LOGIN, which reject
+    /// parameters. Doubling the quotes is what keeps it injection-safe.</summary>
+    private static string QuoteLiteral(string value) => "N'" + (value ?? "").Replace("'", "''") + "'";
+}
+
+/// <summary>Summary of a "continue on error" batch run.</summary>
+public class SqlBatchRunResult
+{
+    public int TotalBatches { get; set; }
+    public int FailedBatches { get; set; }
+    public List<string> Errors { get; } = new();
+
+    /// <summary>Set when the run stopped early rather than continuing past a failure.</summary>
+    public bool Aborted { get; set; }
+    public string? AbortReason { get; set; }
 }

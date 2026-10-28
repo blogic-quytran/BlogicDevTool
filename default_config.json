@@ -1,0 +1,194 @@
+{
+  "Version": 1,
+  "Build": {
+    "OutputBasePath": "D:\\BLOGIC\\Task\\PS-2730_AutoSettleOnlineOrdersBatchInPOS",
+    "Configuration": "Release",
+    "CopyExtensions": [
+      ".dll",
+      ".exe",
+      ".xml",
+      ".exe.config"
+    ],
+    "GitBaseBranch": "origin/develop",
+    "GitCompareBranch": "HEAD",
+    "IncludeUncommitted": false,
+    "FilterByGit": true,
+    "CleanOutputFirst": true,
+    "ZipAfterBuild": false,
+    "Configs": [
+      {
+        "Name": "Common",
+        "SolutionPath": "D:\\BLOGIC\\Planet\\Common\\Source\\BLogicSystems.xPos.Common.sln",
+        "BuildEngine": "msbuild",
+        "OutputFolderName": "Common",
+        "ExtraFolders": [],
+        "RedistributeTo": [
+          "Server",
+          "POS",
+          "BO"
+        ]
+      },
+      {
+        "Name": "Server",
+        "SolutionPath": "D:\\BLOGIC\\Planet\\Server\\Source\\BLogicSystems.xPos.Server.sln",
+        "BuildEngine": "msbuild",
+        "OutputFolderName": "Server/bin",
+        "ExtraFolders": [
+          "Language",
+          "Templates"
+        ],
+        "RedistributeTo": []
+      },
+      {
+        "Name": "POS",
+        "SolutionPath": "D:\\BLOGIC\\Planet\\PointOfSale\\Source\\BLogicSystems.xPos.PointOfSale.sln",
+        "BuildEngine": "msbuild",
+        "OutputFolderName": "POS",
+        "ExtraFolders": [
+          "Language",
+          "Templates",
+          "Sound",
+          "CCP/BLS"
+        ],
+        "RedistributeTo": []
+      },
+      {
+        "Name": "BO",
+        "SolutionPath": "D:\\BLOGIC\\Planet\\BackOffice\\Source\\BLogicSystems.POS.BackOffice.sln",
+        "BuildEngine": "msbuild",
+        "OutputFolderName": "BO",
+        "ExtraFolders": [
+          "Language",
+          "Templates"
+        ],
+        "RedistributeTo": []
+      },
+      {
+        "Name": "MerchantCommon",
+        "SolutionPath": "D:\\BLOGIC\\MerchantUI\\MerchantCommon\\Source\\MerchantCommon.sln",
+        "BuildEngine": "msbuild",
+        "OutputFolderName": "Merchant",
+        "ExtraFolders": [],
+        "RedistributeTo": []
+      },
+      {
+        "Name": "MerchantGUI",
+        "SolutionPath": "D:\\BLOGIC\\MerchantUI\\MerchantGUI\\Source\\MerchantGUI.sln",
+        "BuildEngine": "msbuild",
+        "OutputFolderName": "Merchant",
+        "ExtraFolders": [],
+        "RedistributeTo": []
+      },
+      {
+        "Name": "MerchantService",
+        "SolutionPath": "D:\\BLOGIC\\MerchantUI\\MerchantService\\Source\\MerchantService.sln",
+        "BuildEngine": "msbuild",
+        "OutputFolderName": "Merchant",
+        "ExtraFolders": [],
+        "RedistributeTo": []
+      },
+      {
+        "Name": "BLogicAutoSettlement",
+        "SolutionPath": "D:\\BLOGIC\\BlogicTool\\BLogicAutoSettlement\\BLogicAutoSettlement.sln",
+        "BuildEngine": "msbuild",
+        "OutputFolderName": "BLogicAutoSettlement",
+        "ExtraFolders": [],
+        "RedistributeTo": []
+      },
+      {
+        "Name": "PaymentService",
+        "SolutionPath": "D:\\BLOGIC\\Merchant\\PaymentService.sln",
+        "BuildEngine": "msbuild",
+        "OutputFolderName": "PaymentService",
+        "ExtraFolders": [],
+        "RedistributeTo": []
+      }
+    ]
+  },
+  "UnzipMappings": [
+    {
+      "FolderName": "POS",
+      "DestinationPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic PointOfSale"
+    },
+    {
+      "FolderName": "BO",
+      "DestinationPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic POSDashboard"
+    },
+    {
+      "FolderName": "BLogicConnector",
+      "DestinationPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogicConnector\\bin"
+    },
+    {
+      "FolderName": "Server",
+      "DestinationPath": "C:\\inetpub\\wwwroot\\BLogicService"
+    },
+    {
+      "FolderName": "BLogicReportService",
+      "DestinationPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Service\\BLogicReportService"
+    },
+    {
+      "FolderName": "PaymentService",
+      "DestinationPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Merchant\\BLogic Payment Service\\bin\\"
+    },
+    {
+      "FolderName": "Merchant",
+      "DestinationPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Merchant\\BLogic Merchant Service\\"
+    }
+  ],
+  "WebDav": {
+    "BaseUrl": "http://192.168.1.194:8000/dav",
+    "Username": "pos",
+    "ProtectedPassword": "",
+    "RememberPassword": false,
+    "LastFolderUrl": "http://192.168.1.194:8000/dav/",
+    "ZipOnly": true
+  },
+  "IisEnvPresets": [],
+  "IisDefaultPaths": [
+    {
+      "SiteName": "Default Web Site",
+      "AppPath": "/",
+      "PhysicalPath": "C:\\inetpub\\wwwroot\\"
+    },
+    {
+      "SiteName": "Default Web Site",
+      "AppPath": "/BLogicConnector",
+      "PhysicalPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogicConnector"
+    },
+    {
+      "SiteName": "Default Web Site",
+      "AppPath": "/BLogicKioskWeb",
+      "PhysicalPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogicKioskWeb\\"
+    },
+    {
+      "SiteName": "Default Web Site",
+      "AppPath": "/BLogicService",
+      "PhysicalPath": "C:\\inetpub\\wwwroot\\BLogicService"
+    },
+    {
+      "SiteName": "Default Web Site",
+      "AppPath": "/BLogicTransferMessageService",
+      "PhysicalPath": "C:\\inetpub\\wwwroot\\BLogicTransferMessageService\\"
+    },
+    {
+      "SiteName": "Default Web Site",
+      "AppPath": "/QOrderConnectorService",
+      "PhysicalPath": "C:\\inetpub\\wwwroot\\QOrderConnectorService\\"
+    },
+    {
+      "SiteName": "Default Web Site",
+      "AppPath": "/BLogicEmailService",
+      "PhysicalPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Email Service\\"
+    },
+    {
+      "SiteName": "Default Web Site",
+      "AppPath": "/BLogicMerchantService",
+      "PhysicalPath": "C:\\inetpub\\wwwroot\\BLogicMerchantService\\"
+    },
+    {
+      "SiteName": "Default Web Site",
+      "AppPath": "/BLogicPaymentService",
+      "PhysicalPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Merchant\\BLogic Payment Service\\"
+    }
+  ]
+}

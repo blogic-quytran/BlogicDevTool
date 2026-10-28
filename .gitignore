@@ -4,6 +4,8 @@
 publish/
 publish_single/
 build_logs/
+restore_logs/
+downloads/
 
 # Stray build artifacts in project root
 *.exe
@@ -18,6 +20,8 @@ build_logs/
 
 # Runtime config produced by the tool
 build_config.json
+blogic_devtool_config.json
+blogic_devtool_config.json.*
 
 # Rider / VS Code
 .idea/

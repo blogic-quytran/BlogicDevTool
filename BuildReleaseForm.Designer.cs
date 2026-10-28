@@ -8,6 +8,7 @@ partial class BuildReleaseForm
     private Label lblGlobalOutBase;
     private TextBox txtGlobalOutBase;
     private Button btnGlobalBrowseOutBase;
+    private Button btnOpenOutBase;
     private Label lblExtensions;
     private Button btnExtensions;
 
@@ -36,7 +37,6 @@ partial class BuildReleaseForm
     private Label lblRedistribute;
     private Button btnRedistribute;
     private CheckBox chkFilterGit;
-    private Label lblFilterInfo;
     private Button btnSaveConfig;
 
     private Label lblGitBase;
@@ -54,7 +54,7 @@ partial class BuildReleaseForm
     private Label lblStatus;
     private ProgressBar progressBar;
 
-    private TextBox txtLog;
+    private RichTextBox txtLog;
 
     protected override void Dispose(bool disposing)
     {
@@ -72,6 +72,7 @@ partial class BuildReleaseForm
         lblGlobalOutBase = new Label();
         txtGlobalOutBase = new TextBox();
         btnGlobalBrowseOutBase = new Button();
+        btnOpenOutBase = new Button();
         lblConfig = new Label();
         lblExtensions = new Label();
         btnExtensions = new Button();
@@ -100,7 +101,6 @@ partial class BuildReleaseForm
         lblRedistribute = new Label();
         btnRedistribute = new Button();
         chkFilterGit = new CheckBox();
-        lblFilterInfo = new Label();
         btnSaveConfig = new Button();
         pnlActions = new Panel();
         progressBar = new ProgressBar();
@@ -110,7 +110,7 @@ partial class BuildReleaseForm
         chkCleanFirst = new CheckBox();
         chkZipOutput = new CheckBox();
         lblStatus = new Label();
-        txtLog = new TextBox();
+        txtLog = new RichTextBox();
         pnlGlobal.SuspendLayout();
         pnlList.SuspendLayout();
         pnlDetail.SuspendLayout();
@@ -127,10 +127,12 @@ partial class BuildReleaseForm
         pnlGlobal.Controls.Add(lblGlobalOutBase);
         pnlGlobal.Controls.Add(txtGlobalOutBase);
         pnlGlobal.Controls.Add(btnGlobalBrowseOutBase);
+        pnlGlobal.Controls.Add(btnOpenOutBase);
         pnlGlobal.Controls.Add(lblConfig);
         pnlGlobal.Controls.Add(btnExtensions);
         pnlGlobal.Controls.Add(lblGitBase);
         pnlGlobal.Controls.Add(lblGitCompare);
+        pnlGlobal.Controls.Add(chkFilterGit);
         pnlGlobal.Controls.Add(chkIncludeUncommitted);
         pnlGlobal.Controls.Add(lblExtensions);
         pnlGlobal.Location = new Point(8, 8);
@@ -185,12 +187,22 @@ partial class BuildReleaseForm
         // 
         btnGlobalBrowseOutBase.Location = new Point(587, 3);
         btnGlobalBrowseOutBase.Name = "btnGlobalBrowseOutBase";
-        btnGlobalBrowseOutBase.Size = new Size(99, 26);
+        btnGlobalBrowseOutBase.Size = new Size(56, 26);
         btnGlobalBrowseOutBase.TabIndex = 2;
         btnGlobalBrowseOutBase.Text = "Browse";
         btnGlobalBrowseOutBase.UseVisualStyleBackColor = true;
         btnGlobalBrowseOutBase.Click += btnGlobalBrowseOutBase_Click;
-        // 
+        //
+        // btnOpenOutBase
+        //
+        btnOpenOutBase.Location = new Point(645, 3);
+        btnOpenOutBase.Name = "btnOpenOutBase";
+        btnOpenOutBase.Size = new Size(54, 26);
+        btnOpenOutBase.TabIndex = 3;
+        btnOpenOutBase.Text = "Open";
+        btnOpenOutBase.UseVisualStyleBackColor = true;
+        btnOpenOutBase.Click += btnOpenOutBase_Click;
+        //
         // lblConfig
         // 
         lblConfig.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
@@ -246,7 +258,7 @@ partial class BuildReleaseForm
         // chkIncludeUncommitted
         // 
         chkIncludeUncommitted.AutoSize = true;
-        chkIncludeUncommitted.Location = new Point(141, 69);
+        chkIncludeUncommitted.Location = new Point(150, 69);
         chkIncludeUncommitted.Name = "chkIncludeUncommitted";
         chkIncludeUncommitted.Size = new Size(381, 19);
         chkIncludeUncommitted.TabIndex = 9;
@@ -339,8 +351,6 @@ partial class BuildReleaseForm
         pnlDetail.Controls.Add(txtExtraFolders);
         pnlDetail.Controls.Add(lblRedistribute);
         pnlDetail.Controls.Add(btnRedistribute);
-        pnlDetail.Controls.Add(chkFilterGit);
-        pnlDetail.Controls.Add(lblFilterInfo);
         pnlDetail.Controls.Add(btnSaveConfig);
         pnlDetail.Location = new Point(394, 115);
         pnlDetail.Name = "pnlDetail";
@@ -478,25 +488,16 @@ partial class BuildReleaseForm
         // 
         // chkFilterGit
         // 
-        chkFilterGit.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-        chkFilterGit.Location = new Point(8, 218);
+        chkFilterGit.AutoSize = true;
+        chkFilterGit.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        chkFilterGit.Location = new Point(8, 68);
         chkFilterGit.Name = "chkFilterGit";
-        chkFilterGit.Size = new Size(220, 24);
-        chkFilterGit.TabIndex = 12;
+        chkFilterGit.Size = new Size(126, 19);
+        chkFilterGit.TabIndex = 11;
         chkFilterGit.Text = "Filter by Git Diff";
         chkFilterGit.UseVisualStyleBackColor = true;
         chkFilterGit.CheckedChanged += chkFilterGit_CheckedChanged;
-        // 
-        // lblFilterInfo
-        // 
-        lblFilterInfo.Font = new Font("Segoe UI", 8.5F, FontStyle.Italic);
-        lblFilterInfo.ForeColor = Color.Gray;
-        lblFilterInfo.Location = new Point(28, 246);
-        lblFilterInfo.Name = "lblFilterInfo";
-        lblFilterInfo.Size = new Size(440, 36);
-        lblFilterInfo.TabIndex = 13;
-        lblFilterInfo.Text = "Uses global Git Base/Compare above; repo auto-detected from solution path.";
-        // 
+        //
         // btnSaveConfig
         // 
         btnSaveConfig.BackColor = Color.FromArgb(0, 120, 212);
@@ -504,7 +505,7 @@ partial class BuildReleaseForm
         btnSaveConfig.FlatStyle = FlatStyle.Flat;
         btnSaveConfig.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
         btnSaveConfig.ForeColor = Color.White;
-        btnSaveConfig.Location = new Point(108, 280);
+        btnSaveConfig.Location = new Point(108, 228);
         btnSaveConfig.Name = "btnSaveConfig";
         btnSaveConfig.Size = new Size(260, 36);
         btnSaveConfig.TabIndex = 14;
@@ -609,12 +610,11 @@ partial class BuildReleaseForm
         // 
         txtLog.BackColor = Color.FromArgb(30, 30, 30);
         txtLog.Font = new Font("Consolas", 9F);
-        txtLog.ForeColor = Color.LightGray;
+        txtLog.ForeColor = Color.Gainsboro;
         txtLog.Location = new Point(8, 504);
-        txtLog.Multiline = true;
         txtLog.Name = "txtLog";
         txtLog.ReadOnly = true;
-        txtLog.ScrollBars = ScrollBars.Both;
+        txtLog.ScrollBars = RichTextBoxScrollBars.Both;
         txtLog.Size = new Size(864, 165);
         txtLog.TabIndex = 4;
         txtLog.WordWrap = false;

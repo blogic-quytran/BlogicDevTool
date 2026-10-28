@@ -15,16 +15,11 @@ public class IisDefaultPaths
 }
 
 /// <summary>
-/// Read-only store of the factory-default PhysicalPath for each IIS app.
-/// Loaded from "default_iis_paths.json" shipped beside the executable; falls back
-/// to a built-in table if the file is missing or unreadable. Keyed by "site|app"
-/// (same convention as <see cref="IisLocalStore"/>). Used by the Reset Path button.
+/// Factory-default PhysicalPath per IIS app for the Reset Path button, from the
+/// "IisDefaultPaths" section of <see cref="AppConfigStore"/> (seeded from the built-in table).
 /// </summary>
 public static class IisDefaultPathStore
 {
-    private static readonly string DefaultsFile = Path.Combine(
-        AppContext.BaseDirectory, "default_iis_paths.json");
-
     private static Dictionary<string, string>? _cache;
 
     private static string Key(string siteName, string appPath) => $"{siteName}|{appPath}";
@@ -34,19 +29,11 @@ public static class IisDefaultPathStore
         if (_cache != null) return _cache;
 
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            if (File.Exists(DefaultsFile))
-            {
-                var json = File.ReadAllText(DefaultsFile);
-                var parsed = JsonSerializer.Deserialize<IisDefaultPaths>(json);
-                if (parsed?.Defaults != null)
-                    foreach (var d in parsed.Defaults)
-                        if (!string.IsNullOrWhiteSpace(d.SiteName) && !string.IsNullOrWhiteSpace(d.AppPath))
-                            map[Key(d.SiteName, d.AppPath)] = d.PhysicalPath ?? "";
-            }
-        }
-        catch { /* fall through to built-in */ }
+        var entries = AppConfigStore.Get(c => c.IisDefaultPaths, (c, v) => c.IisDefaultPaths = v,
+            () => BuiltInDefaults().ToList());
+        foreach (var d in entries)
+            if (!string.IsNullOrWhiteSpace(d.SiteName) && !string.IsNullOrWhiteSpace(d.AppPath))
+                map[Key(d.SiteName, d.AppPath)] = d.PhysicalPath ?? "";
 
         if (map.Count == 0)
             foreach (var d in BuiltInDefaults())

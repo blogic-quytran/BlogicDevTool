@@ -7,12 +7,49 @@ public partial class DatabaseToolsForm : UserControl
 
     // ── SQL Templates (Restore) ────────────────────────────────────────────
 
-    private const string BlogicTemplate =
+    // Snapshots must go first: RESTORE fails while any snapshot exists on the target.
+    // TRY/CATCH per step because no GO separates this from the RESTORE below — a KILL
+    // racing a disconnecting session would otherwise abort the restore itself.
+    private const string PrepareDbBlock =
         "USE master;\r\nGO\r\n" +
         "IF EXISTS (SELECT name FROM sys.databases WHERE name = '{DB_NAME}')\r\n" +
         "BEGIN\r\n" +
+        "    BEGIN TRY\r\n" +
+        "        DECLARE @snapKill NVARCHAR(MAX) = N'';\r\n" +
+        "        SELECT @snapKill += N'KILL ' + CAST(s.session_id AS NVARCHAR(10)) + N';'\r\n" +
+        "        FROM sys.dm_exec_sessions s\r\n" +
+        "        JOIN sys.databases d ON d.database_id = s.database_id\r\n" +
+        "        WHERE d.source_database_id = DB_ID('{DB_NAME}') AND s.session_id <> @@SPID;\r\n" +
+        "        EXEC(@snapKill);\r\n" +
+        "    END TRY\r\n" +
+        "    BEGIN CATCH\r\n" +
+        "        PRINT N'[prepare] snapshot sessions: ' + ERROR_MESSAGE();\r\n" +
+        "    END CATCH;\r\n" +
+        "    BEGIN TRY\r\n" +
+        "        DECLARE @dropSnap NVARCHAR(MAX) = N'';\r\n" +
+        "        SELECT @dropSnap += N'DROP DATABASE [' + REPLACE(name, N']', N']]') + N'];'\r\n" +
+        "        FROM sys.databases WHERE source_database_id = DB_ID('{DB_NAME}');\r\n" +
+        "        IF @dropSnap <> N'' PRINT N'[prepare] dropping snapshots: ' + @dropSnap;\r\n" +
+        "        EXEC(@dropSnap);\r\n" +
+        "    END TRY\r\n" +
+        "    BEGIN CATCH\r\n" +
+        "        PRINT N'[prepare] drop snapshots: ' + ERROR_MESSAGE();\r\n" +
+        "    END CATCH;\r\n" +
+        "    BEGIN TRY\r\n" +
+        "        DECLARE @kill NVARCHAR(MAX) = N'';\r\n" +
+        "        SELECT @kill += N'KILL ' + CAST(session_id AS NVARCHAR(10)) + N';'\r\n" +
+        "        FROM sys.dm_exec_sessions\r\n" +
+        "        WHERE database_id = DB_ID('{DB_NAME}') AND session_id <> @@SPID;\r\n" +
+        "        EXEC(@kill);\r\n" +
+        "    END TRY\r\n" +
+        "    BEGIN CATCH\r\n" +
+        "        PRINT N'[prepare] kill sessions: ' + ERROR_MESSAGE();\r\n" +
+        "    END CATCH;\r\n" +
         "    ALTER DATABASE [{DB_NAME}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\r\n" +
-        "END\r\n" +
+        "END\r\n";
+
+    private const string BlogicTemplate =
+        PrepareDbBlock +
         "RESTORE DATABASE [{DB_NAME}]\r\n" +
         "FROM DISK = '{BAK_PATH}'\r\n" +
         "WITH\r\n" +
@@ -25,11 +62,7 @@ public partial class DatabaseToolsForm : UserControl
         "GO";
 
     private const string MerchantTemplate =
-        "USE master;\r\nGO\r\n" +
-        "IF EXISTS (SELECT name FROM sys.databases WHERE name = '{DB_NAME}')\r\n" +
-        "BEGIN\r\n" +
-        "    ALTER DATABASE [{DB_NAME}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\r\n" +
-        "END\r\n" +
+        PrepareDbBlock +
         "RESTORE DATABASE [{DB_NAME}]\r\n" +
         "FROM DISK = '{BAK_PATH}'\r\n" +
         "WITH\r\n" +
@@ -42,11 +75,7 @@ public partial class DatabaseToolsForm : UserControl
         "GO";
 
     private const string MailTemplate =
-        "USE master;\r\nGO\r\n" +
-        "IF EXISTS (SELECT name FROM sys.databases WHERE name = '{DB_NAME}')\r\n" +
-        "BEGIN\r\n" +
-        "    ALTER DATABASE [{DB_NAME}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\r\n" +
-        "END\r\n" +
+        PrepareDbBlock +
         "RESTORE DATABASE [{DB_NAME}]\r\n" +
         "FROM DISK = '{BAK_PATH}'\r\n" +
         "WITH\r\n" +
@@ -498,6 +527,7 @@ public partial class DatabaseToolsForm : UserControl
         lblZipRestoreStatus.ForeColor = System.Drawing.Color.DarkGray;
 
         var tempBakPath = string.Empty;
+        var restoreSql = string.Empty;
         try
         {
             string bakPath;
@@ -522,7 +552,20 @@ public partial class DatabaseToolsForm : UserControl
             }
             else
             {
-                bakPath = directPath;
+                // A .bak outside the data directory is usually unreadable by the SQL Server
+                // service account (OS error 5), so stage a copy the service can always read.
+                if (IsUnderDirectory(directPath, dataPath))
+                {
+                    bakPath = directPath;
+                }
+                else
+                {
+                    tempBakPath = System.IO.Path.Combine(
+                        dataPath, $"blogic_restore_{Guid.NewGuid():N}.bak");
+                    lblZipRestoreStatus.Text = "Staging .bak into data directory, please wait...";
+                    await Task.Run(() => System.IO.File.Copy(directPath, tempBakPath, overwrite: true));
+                    bakPath = tempBakPath;
+                }
             }
 
             lblZipRestoreStatus.Text = "Executing restore, please wait...";
@@ -534,6 +577,7 @@ public partial class DatabaseToolsForm : UserControl
                 .Replace("{DB_NAME}",   dbName)
                 .Replace("{BAK_PATH}",  bakPath)
                 .Replace("{DATA_PATH}", dataPath);
+            restoreSql = sql;
 
             await _helper.ExecuteSqlBatchesAsync(sql);
 
@@ -552,17 +596,28 @@ public partial class DatabaseToolsForm : UserControl
                 await _helper.ExecuteSqlBatchesAsync(cleanupSql, dbName);
             }
 
+            var okLog = SaveRestoreLog(dbName, restoreSql, true, null);
             lblZipRestoreStatus.ForeColor = System.Drawing.Color.Green;
             lblZipRestoreStatus.Text = $"✔ Restore '{dbName}' successful!";
-            MessageBox.Show($"Restore database '{dbName}' succeeded!", "Success",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                $"Restore database '{dbName}' succeeded!" +
+                (okLog != null ? $"\n\nLog: {okLog}" : ""),
+                "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
+            // A failed RESTORE can leave the DB stuck in SINGLE_USER (the template's
+            // MULTI_USER batch never ran). Force it back so a retry isn't blocked.
+            if (_helper != null && !string.IsNullOrWhiteSpace(dbName))
+                await _helper.TrySetMultiUserAsync(dbName);
+
+            var failLog = SaveRestoreLog(dbName, restoreSql, false, ex.ToString());
             lblZipRestoreStatus.ForeColor = System.Drawing.Color.Red;
             lblZipRestoreStatus.Text = $"✘ Error: {ex.Message}";
-            MessageBox.Show($"Restore error:\n{ex.Message}", "Error",
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(
+                $"Restore error:\n{ex.Message}" +
+                (failLog != null ? $"\n\nLog saved: {failLog}" : ""),
+                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
@@ -574,5 +629,60 @@ public partial class DatabaseToolsForm : UserControl
                 try { System.IO.File.Delete(tempBakPath); } catch { /* ignore cleanup error */ }
             }
         }
+    }
+
+    /// <summary>Writes the executed SQL plus outcome to restore_logs\, like the build logs.
+    /// Returns null on failure — logging must never break the restore flow.</summary>
+    private static string? SaveRestoreLog(string dbName, string sql, bool success, string? error)
+    {
+        try
+        {
+            var dir = System.IO.Path.Combine(AppContext.BaseDirectory, "restore_logs");
+            System.IO.Directory.CreateDirectory(dir);
+
+            var invalid = System.IO.Path.GetInvalidFileNameChars();
+            var safe = new string((dbName ?? "db")
+                .Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray());
+            if (string.IsNullOrWhiteSpace(safe)) safe = "db";
+            var ts = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var path = System.IO.Path.Combine(dir, $"{safe}_{ts}_{(success ? "ok" : "failed")}.log");
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("=== BLogicDevTool Restore Log ===");
+            sb.AppendLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Database:  {dbName}");
+            sb.AppendLine($"Status:    {(success ? "SUCCESS" : "FAILED")}");
+            sb.AppendLine(new string('-', 70));
+            sb.AppendLine("[SQL]");
+            sb.AppendLine(sql);
+            if (!string.IsNullOrEmpty(error))
+            {
+                sb.AppendLine(new string('-', 70));
+                sb.AppendLine("[ERROR]");
+                sb.AppendLine(error);
+            }
+            System.IO.File.WriteAllText(path, sb.ToString());
+            return path;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>True if <paramref name="filePath"/> lives inside <paramref name="directory"/>
+    /// (or the directory itself). Used to decide whether a .bak must be staged into the
+    /// SQL data directory before restore.</summary>
+    private static bool IsUnderDirectory(string filePath, string directory)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || string.IsNullOrWhiteSpace(directory))
+                return false;
+            var file = System.IO.Path.GetFullPath(filePath);
+            var dir = System.IO.Path.GetFullPath(directory)
+                .TrimEnd(System.IO.Path.DirectorySeparatorChar,
+                         System.IO.Path.AltDirectorySeparatorChar);
+            return file.StartsWith(dir + System.IO.Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
     }
 }

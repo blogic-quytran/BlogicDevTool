@@ -7,6 +7,7 @@ partial class IisServiceManagerForm
     // Toolbar row
     private System.Windows.Forms.Button btnRefresh;
     private System.Windows.Forms.Button btnTroubleshoot;
+    private System.Windows.Forms.Button btnSwitchEnv;
 
     // Top grid
     private System.Windows.Forms.DataGridView dgvApps;
@@ -54,6 +55,7 @@ partial class IisServiceManagerForm
     {
         btnRefresh = new Button();
         btnTroubleshoot = new Button();
+        btnSwitchEnv = new Button();
         dgvApps = new DataGridView();
         grpDetail = new GroupBox();
         lblDetailSiteCaption = new Label();
@@ -111,9 +113,23 @@ partial class IisServiceManagerForm
         btnTroubleshoot.Text = "🔧  Troubleshoot IIS";
         btnTroubleshoot.UseVisualStyleBackColor = false;
         btnTroubleshoot.Click += btnTroubleshoot_Click;
-        // 
+        //
+        // btnSwitchEnv
+        //
+        btnSwitchEnv.BackColor = Color.FromArgb(0, 140, 110);
+        btnSwitchEnv.FlatStyle = FlatStyle.Flat;
+        btnSwitchEnv.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        btnSwitchEnv.ForeColor = Color.White;
+        btnSwitchEnv.Location = new Point(395, 10);
+        btnSwitchEnv.Name = "btnSwitchEnv";
+        btnSwitchEnv.Size = new Size(215, 30);
+        btnSwitchEnv.TabIndex = 2;
+        btnSwitchEnv.Text = "🗄  Switch Environment...";
+        btnSwitchEnv.UseVisualStyleBackColor = false;
+        btnSwitchEnv.Click += btnSwitchEnv_Click;
+        //
         // dgvApps
-        // 
+        //
         dgvApps.AllowUserToAddRows = false;
         dgvApps.AllowUserToDeleteRows = false;
         dgvApps.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
@@ -416,6 +432,7 @@ partial class IisServiceManagerForm
         AutoScaleMode = AutoScaleMode.Font;
         Controls.Add(btnRefresh);
         Controls.Add(btnTroubleshoot);
+        Controls.Add(btnSwitchEnv);
         Controls.Add(dgvApps);
         Controls.Add(grpDetail);
         Controls.Add(grpChange);
