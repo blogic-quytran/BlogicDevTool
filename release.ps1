@@ -46,7 +46,7 @@ if ($current -ne $Version) {
 Get-Process -Name BLogicDevTool -ErrorAction SilentlyContinue | Stop-Process -Force
 $out = Join-Path $PSScriptRoot 'publish_release'
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
-Run dotnet @('publish', '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true',
+Run dotnet @('publish', $csproj, '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true',
     '-p:PublishSingleFile=true', '-p:IncludeNativeLibrariesForSelfExtract=true',
     '-p:EnableCompressionInSingleFile=true', '-o', $out, '--nologo')
 $exe = Join-Path $out 'BLogicDevTool.exe'
