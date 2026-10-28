@@ -55,7 +55,64 @@ public partial class Form1 : Form
     {
         base.OnLoad(e);
         WindowState = FormWindowState.Normal;
+        Text = $"BLogic Dev Tool {UpdateService.CurrentVersionText}";
+        new ToolTip().SetToolTip(lblTitle, $"Version {UpdateService.CurrentVersionText}");
         menuItemUnzip_Click(this, EventArgs.Empty);
+        UpdateService.CleanupPreviousUpdate();
+        _ = CheckForUpdateAsync();
+    }
+
+    // ── Update check (GitHub Releases) ───────────────────────────────
+    private async Task CheckForUpdateAsync()
+    {
+        UpdateInfo? info;
+        try { info = await UpdateService.CheckAsync(); }
+        catch { return; } // offline / rate-limited — silently skip, retry next launch
+        if (info == null || IsDisposed) return;
+        ShowUpdateBanner(info);
+    }
+
+    private void ShowUpdateBanner(UpdateInfo info)
+    {
+        var banner = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = Color.FromArgb(255, 243, 205) };
+        var lbl = new Label
+        {
+            Text      = $"🔔 New version {info.Tag} is available (current {UpdateService.CurrentVersionText}).",
+            AutoSize  = true,
+            Font      = new Font("Segoe UI", 9F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(102, 77, 3),
+            Location  = new Point(10, 7),
+        };
+        var btnView = new Button
+        {
+            Text      = "View && install",
+            Size      = new Size(110, 24),
+            Location  = new Point(lbl.PreferredWidth + 20, 3),
+            BackColor = Color.FromArgb(0, 102, 204),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+        };
+        btnView.FlatAppearance.BorderSize = 0;
+        btnView.Click += (_, _) =>
+        {
+            using var dlg = new UpdateForm(info);
+            dlg.ShowDialog(this);
+        };
+        var btnHide = new Button
+        {
+            Text      = "✕",
+            Size      = new Size(30, 30),
+            Dock      = DockStyle.Right,
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = Color.FromArgb(102, 77, 3),
+        };
+        btnHide.FlatAppearance.BorderSize = 0;
+        btnHide.Click += (_, _) => banner.Dispose();
+
+        banner.Controls.AddRange(new Control[] { lbl, btnView, btnHide });
+        panel1.Controls.Add(banner);
+        // Dock order follows z-order: keep the banner between pnlNav (top) and pnlMain (fill).
+        panel1.Controls.SetChildIndex(banner, panel1.Controls.GetChildIndex(pnlNav));
     }
 
     // ── Helper: embed UserControl in pnlMain ─────────────────────────

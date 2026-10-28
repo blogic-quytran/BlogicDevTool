@@ -3,6 +3,7 @@
 [Oo]bj/
 publish/
 publish_single/
+publish_release/
 build_logs/
 restore_logs/
 downloads/

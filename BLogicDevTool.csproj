@@ -10,6 +10,8 @@
     <ApplicationIcon>folder_settings_tools_22597.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <NoWarn>NU1605</NoWarn>
+    <!-- Bumped by release.ps1; the app compares it with the latest GitHub release tag. -->
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
