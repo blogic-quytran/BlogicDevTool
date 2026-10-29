@@ -57,6 +57,10 @@ Run dotnet @('publish', $csproj, '-c', 'Release', '-r', 'win-x64', '--self-conta
     '-p:EnableCompressionInSingleFile=true', '-o', $out, '--nologo')
 $exe = Join-Path $out 'BLogicDevTool.exe'
 if (-not (Test-Path $exe)) { throw "Publish did not produce $exe" }
+# The app verifies the download against this (it reads releases.atom, which carries no digests).
+$shaFile = "$exe.sha256"
+$hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+[IO.File]::WriteAllText($shaFile, "$hash  BLogicDevTool.exe`n", (New-Object Text.UTF8Encoding $false))
 
 if ($current -ne $Version) {
     Run git @('add', 'BLogicDevTool.csproj')
@@ -69,7 +73,7 @@ Run git @('push', 'origin', $tag)
 $notesFile = Join-Path $env:TEMP "blogic_release_notes_$tag.md"
 [IO.File]::WriteAllText($notesFile, $Notes, (New-Object Text.UTF8Encoding $false))
 try {
-    Run gh @('release', 'create', $tag, $exe, '--title', $title, '--notes-file', $notesFile)
+    Run gh @('release', 'create', $tag, $exe, $shaFile, '--title', $title, '--notes-file', $notesFile)
 } finally {
     Remove-Item $notesFile -Force -ErrorAction SilentlyContinue
 }

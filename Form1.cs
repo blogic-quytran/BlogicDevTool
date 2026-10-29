@@ -55,10 +55,7 @@ public partial class Form1 : Form
     {
         base.OnLoad(e);
         WindowState = FormWindowState.Normal;
-        Text = $"BLogic Dev Tool {UpdateService.CurrentVersionText}";
-        new ToolTip().SetToolTip(lblTitle, $"Version {UpdateService.CurrentVersionText}");
         menuItemUnzip_Click(this, EventArgs.Empty);
-        UpdateService.CleanupPreviousUpdate();
         _ = CheckForUpdateAsync();
     }
 
@@ -66,8 +63,14 @@ public partial class Form1 : Form
     private async Task CheckForUpdateAsync()
     {
         UpdateInfo? info;
-        try { info = await UpdateService.CheckAsync(); }
-        catch { return; } // offline / rate-limited — silently skip, retry next launch
+        try
+        {
+            Text = $"BLogic Dev Tool {UpdateService.CurrentVersionText}";
+            new ToolTip().SetToolTip(lblTitle, $"Version {UpdateService.CurrentVersionText}");
+            UpdateService.CleanupPreviousUpdate();
+            info = await UpdateService.CheckAsync();
+        }
+        catch { return; } // offline / rate-limited / any updater fault must never take the tool down
         if (info == null || IsDisposed) return;
         ShowUpdateBanner(info);
         // Cancel is not remembered on purpose: every launch asks again until the user updates.

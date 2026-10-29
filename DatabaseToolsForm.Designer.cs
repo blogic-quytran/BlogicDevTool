@@ -31,6 +31,7 @@ partial class DatabaseToolsForm
     private System.Windows.Forms.Label lblZipPath;
     private System.Windows.Forms.TextBox txtZipPath;
     private System.Windows.Forms.Button btnBrowseZip;
+    private System.Windows.Forms.Button btnOpenZipFolder;
     private System.Windows.Forms.GroupBox grpBakList;
     private System.Windows.Forms.ListView lvwBakFiles;
     private System.Windows.Forms.ColumnHeader colBakName;
@@ -72,6 +73,7 @@ partial class DatabaseToolsForm
         lblZipPath = new Label();
         txtZipPath = new TextBox();
         btnBrowseZip = new Button();
+        btnOpenZipFolder = new Button();
         grpBakList = new GroupBox();
         lvwBakFiles = new ListView();
         colBakName = new ColumnHeader();
@@ -170,6 +172,7 @@ partial class DatabaseToolsForm
         grpZipFile.Controls.Add(lblZipPath);
         grpZipFile.Controls.Add(txtZipPath);
         grpZipFile.Controls.Add(btnBrowseZip);
+        grpZipFile.Controls.Add(btnOpenZipFolder);
         grpZipFile.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         grpZipFile.Location = new Point(8, 6);
         grpZipFile.Name = "grpZipFile";
@@ -195,20 +198,32 @@ partial class DatabaseToolsForm
         txtZipPath.Location = new Point(72, 25);
         txtZipPath.Name = "txtZipPath";
         txtZipPath.ReadOnly = true;
-        txtZipPath.Size = new Size(676, 23);
+        txtZipPath.Size = new Size(640, 23);
         txtZipPath.TabIndex = 1;
         // 
         // btnBrowseZip
         // 
         btnBrowseZip.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         btnBrowseZip.Font = new Font("Segoe UI", 9F);
-        btnBrowseZip.Location = new Point(755, 25);
+        btnBrowseZip.Location = new Point(719, 25);
         btnBrowseZip.Name = "btnBrowseZip";
         btnBrowseZip.Size = new Size(85, 26);
         btnBrowseZip.TabIndex = 2;
         btnBrowseZip.Text = "Browse...";
         btnBrowseZip.UseVisualStyleBackColor = true;
         btnBrowseZip.Click += btnBrowseZip_Click;
+        // 
+        // btnOpenZipFolder
+        // 
+        btnOpenZipFolder.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnOpenZipFolder.Font = new Font("Segoe UI", 9F);
+        btnOpenZipFolder.Location = new Point(808, 25);
+        btnOpenZipFolder.Name = "btnOpenZipFolder";
+        btnOpenZipFolder.Size = new Size(32, 26);
+        btnOpenZipFolder.TabIndex = 3;
+        btnOpenZipFolder.Text = "📂";
+        btnOpenZipFolder.UseVisualStyleBackColor = true;
+        btnOpenZipFolder.Click += btnOpenZipFolder_Click;
         // 
         // grpBakList
         // 

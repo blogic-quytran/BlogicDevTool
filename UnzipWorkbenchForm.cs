@@ -289,8 +289,12 @@ public partial class UnzipWorkbenchForm : UserControl
         // without them the browser has to run once (it is what stores them). TryCreate, not
         // StartsWith: a half-typed "http://" would throw out of this async void and kill the app.
         var pasted = txtZipPath.Text.Trim();
-        if (Uri.TryCreate(pasted, UriKind.Absolute, out var pastedUri)
-            && (pastedUri.Scheme == Uri.UriSchemeHttp || pastedUri.Scheme == Uri.UriSchemeHttps))
+        var shareLink = WebDavClient.IsShareLink(pasted) ? pasted : null;
+        if (shareLink != null)   // soteria://files/... → http URL under the saved server
+            pasted = WebDavClient.ResolveLink(WebDavSettingsStore.Load().BaseUrl, shareLink) ?? "";
+        var isHttp = Uri.TryCreate(pasted, UriKind.Absolute, out var pastedUri)
+                     && (pastedUri.Scheme == Uri.UriSchemeHttp || pastedUri.Scheme == Uri.UriSchemeHttps);
+        if (isHttp && pastedUri!.AbsolutePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
         {
             var saved = WebDavSettingsStore.Load();
             var savedPass = WebDavSettingsStore.Unprotect(saved.ProtectedPassword);
@@ -303,7 +307,8 @@ public partial class UnzipWorkbenchForm : UserControl
             }
         }
 
-        using var dlg = new WebDavBrowserForm();
+        // A folder link (or a file link without saved credentials) opens the browser right there.
+        using var dlg = new WebDavBrowserForm(shareLink ?? (isHttp ? pasted : null));
         if (dlg.ShowDialog(FindForm()) != DialogResult.OK) return;
         await DownloadZipAsync(dlg.BaseUrl, dlg.Username, dlg.Password,
             dlg.SelectedUrl, dlg.SelectedName, dlg.SelectedLength);

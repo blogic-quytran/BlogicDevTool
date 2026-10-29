@@ -18,9 +18,13 @@ public partial class WebDavBrowserForm : Form
     public string Username { get; private set; } = "";
     public string Password { get; private set; } = "";
 
-    public WebDavBrowserForm()
+    /// <summary>Folder or file to open on connect instead of the last folder (share link, URL or path).</summary>
+    private string? _startLink;
+
+    public WebDavBrowserForm(string? startLink = null)
     {
         InitializeComponent();
+        _startLink = string.IsNullOrWhiteSpace(startLink) ? null : startLink.Trim();
     }
 
     protected override async void OnLoad(EventArgs e)
@@ -71,6 +75,13 @@ public partial class WebDavBrowserForm : Form
         BaseUrl = url;
         Username = txtUser.Text.Trim();
         Password = txtPass.Text;
+
+        if (_startLink != null && await GoToLinkAsync(_startLink))
+        {
+            _startLink = null;   // kept on failure so a retry after fixing credentials still jumps there
+            ShowConnectionBar(false);
+            return;
+        }
 
         var target = !string.IsNullOrWhiteSpace(startUrl)
                      && startUrl.StartsWith(url, StringComparison.OrdinalIgnoreCase)
@@ -126,6 +137,59 @@ public partial class WebDavBrowserForm : Form
         {
             SetBusy(false);
         }
+    }
+
+    // ── Go to a pasted link (soteria://files/..., http URL or /dav/... path) ──────
+
+    private async void txtPath_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.KeyCode != Keys.Enter) return;
+        e.Handled = e.SuppressKeyPress = true;   // no ding
+        if (_client == null)
+        {
+            _startLink = txtPath.Text;   // used once the user connects
+            SetStatus("⚠ Connect first — the path will open after login.");
+            ShowConnectionBar(true);
+            return;
+        }
+        if (await GoToLinkAsync(txtPath.Text))
+            lstItems.Focus();
+    }
+
+    /// <summary>Opens the folder of <paramref name="text"/>; a file link opens its folder and selects the file.</summary>
+    private async Task<bool> GoToLinkAsync(string text)
+    {
+        if (_client == null) return false;
+        var url = WebDavClient.ResolveLink(_client.BaseUri.AbsoluteUri, text);
+        if (url == null || !url.StartsWith(_client.BaseUri.AbsoluteUri, StringComparison.OrdinalIgnoreCase))
+        {
+            SetStatus($"✘ Not a path on this server: {text}");
+            return false;
+        }
+
+        // A last segment with an extension (".zip") is treated as a file: open its folder and select it.
+        var lastSegment = Uri.UnescapeDataString(new Uri(url).Segments[^1]);
+        var isFile = !url.EndsWith("/") && Path.HasExtension(lastSegment);
+        if (!isFile)
+            return await NavigateAsync(url);
+
+        var parent = url[..(url.LastIndexOf('/') + 1)];
+        if (!await NavigateAsync(parent)) return false;
+
+        if (!lastSegment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && chkZipOnly.Checked)
+            chkZipOnly.Checked = false;   // otherwise the file would be hidden
+        foreach (ListViewItem item in lstItems.Items)
+        {
+            if (item.Tag is WebDavEntry entry && entry.Name.Equals(lastSegment, StringComparison.OrdinalIgnoreCase))
+            {
+                if (entry.IsFolder) return await NavigateAsync(entry.Url);   // a folder with a dot in its name
+                item.Selected = item.Focused = true;
+                item.EnsureVisible();
+                return true;
+            }
+        }
+        SetStatus($"⚠ File not found in this folder: {lastSegment}");
+        return true;
     }
 
     // ── Column sorting ────────────────────────────────────────────────────────

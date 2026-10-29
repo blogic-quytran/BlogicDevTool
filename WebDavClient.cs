@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace BLogicDevTool;
@@ -214,6 +215,45 @@ public sealed class WebDavClient : IDisposable
                 $"Downloaded, but '{destPath}' could not be replaced ({ex.Message}). " +
                 $"The complete file is kept at '{partPath}'.", ex);
         }
+    }
+
+    /// <summary>True for a share link like "soteria://files/POS/Quy/x.zip" (path relative to the DAV root).</summary>
+    public static bool IsShareLink(string text)
+        => Regex.IsMatch(text.Trim(), @"^(?!https?://)[a-z][a-z0-9+.-]*://files(/|$)", RegexOptions.IgnoreCase);
+
+    /// <summary>Absolute http(s) URL for a share link, an http(s) URL, "/dav/POS/..." or a path
+    /// relative to the DAV root ("POS/Quy"). Null when the text can't be turned into one.</summary>
+    public static string? ResolveLink(string baseUrl, string text)
+    {
+        text = text.Trim().Replace('\\', '/');
+        if (text.Length == 0) return null;
+        if (!baseUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            baseUrl = "http://" + baseUrl;
+        if (!Uri.TryCreate(baseUrl.TrimEnd('/') + "/", UriKind.Absolute, out var baseUri)) return null;
+
+        if (Uri.TryCreate(text, UriKind.Absolute, out var abs)
+            && (abs.Scheme == Uri.UriSchemeHttp || abs.Scheme == Uri.UriSchemeHttps))
+            return abs.AbsoluteUri;
+
+        string rel;
+        var share = Regex.Match(text, @"^[a-z][a-z0-9+.-]*://files/?(.*)$", RegexOptions.IgnoreCase);
+        if (share.Success)
+            rel = share.Groups[1].Value;
+        else if (text.Contains("://"))
+            return null;
+        else
+        {
+            // "/dav/POS" already carries the mount prefix; "/POS" or "POS" are relative to it.
+            var prefix = baseUri.AbsolutePath;                                   // "/dav/"
+            rel = text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? text[prefix.Length..] : text;
+        }
+
+        // Unescape first so an already-escaped link isn't double-escaped.
+        var segments = rel.Split('?', '#')[0].Split('/', StringSplitOptions.RemoveEmptyEntries)
+                          .Select(s => Uri.EscapeDataString(Uri.UnescapeDataString(s)));
+        var path = string.Join("/", segments);
+        if (path.Length > 0 && rel.EndsWith("/")) path += "/";
+        return new Uri(baseUri, path).AbsoluteUri;
     }
 
     /// <summary>Absolute URL from a PROPFIND href. SFTPGo reports hrefs relative to the DAV

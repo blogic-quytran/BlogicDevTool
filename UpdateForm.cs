@@ -36,7 +36,8 @@ public sealed class UpdateForm : Form
         };
         var lblSub = new Label
         {
-            Text      = $"Current version: {UpdateService.CurrentVersionText}  ·  download {info.Size / 1024.0 / 1024.0:0.0} MB{published}",
+            Text      = $"Current version: {UpdateService.CurrentVersionText}"
+                        + (info.Size > 0 ? $"  ·  download {info.Size / 1024.0 / 1024.0:0.0} MB" : "") + published,
             ForeColor = Color.DimGray,
             Location  = new Point(18, 44),
             AutoSize  = true,

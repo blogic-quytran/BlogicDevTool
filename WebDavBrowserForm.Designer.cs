@@ -205,9 +205,9 @@ partial class WebDavBrowserForm
         txtPath.Font = new Font("Consolas", 9F);
         txtPath.Location = new Point(166, 6);
         txtPath.Name = "txtPath";
-        txtPath.ReadOnly = true;
         txtPath.Size = new Size(482, 23);
         txtPath.TabIndex = 3;
+        txtPath.KeyDown += txtPath_KeyDown;
         //
         // chkZipOnly
         //

@@ -317,6 +317,18 @@ public partial class DatabaseToolsForm : UserControl
         }
     }
 
+    private void btnOpenZipFolder_Click(object sender, EventArgs e)
+    {
+        var zipPath = txtZipPath.Text.Trim();
+        if (File.Exists(zipPath))
+            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{zipPath}\"");   // open folder with the ZIP highlighted
+        else if (Directory.Exists(Path.GetDirectoryName(zipPath)))
+            System.Diagnostics.Process.Start("explorer.exe", $"\"{Path.GetDirectoryName(zipPath)}\"");
+        else
+            MessageBox.Show("Please select a ZIP file first.", "Open Folder",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
     private void btnScanZip_Click(object sender, EventArgs e)
     {
         var zipPath = txtZipPath.Text.Trim();

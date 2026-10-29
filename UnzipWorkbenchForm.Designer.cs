@@ -128,7 +128,7 @@ partial class UnzipWorkbenchForm
         txtZipPath.Anchor = AnchorStyles.Left | AnchorStyles.Right;
         txtZipPath.Location = new Point(68, 8);
         txtZipPath.Name = "txtZipPath";
-        txtZipPath.PlaceholderText = "Select a .zip file, or paste a http:// URL...";
+        txtZipPath.PlaceholderText = "Select a .zip file, or paste a http:// / soteria:// link, then click URL...";
         txtZipPath.Size = new Size(411, 23);
         txtZipPath.TabIndex = 1;
         txtZipPath.TextChanged += txtZipPath_TextChanged;
