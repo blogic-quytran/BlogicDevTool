@@ -28,6 +28,8 @@ public partial class BuildReleaseForm : UserControl
     private bool _suppressDetailEvents = false;
     private bool _suppressGlobalEvents = false;
     private bool _isBusy = false;
+    private readonly GitBranchPicker _basePicker;
+    private readonly GitBranchPicker _comparePicker;
 
     public BuildReleaseForm()
     {
@@ -39,7 +41,15 @@ public partial class BuildReleaseForm : UserControl
         _cleanTip.SetToolTip(chkFilterGit,
             "Applies to every config: build/copy only projects changed between Git Base and Git Compare.\n"
             + "Repo is auto-detected from each solution path.");
-        Disposed += (_, _) => { _log.Dispose(); _cleanTip.Dispose(); };
+        _cleanTip.SetToolTip(btnGitBasePick, "Pick / search a branch (from the checked configs' repos)");
+        _cleanTip.SetToolTip(btnGitComparePick, "Pick / search a branch (from the checked configs' repos)");
+        _basePicker = new GitBranchPicker(txtGitBase, GetPickerRepos);
+        _comparePicker = new GitBranchPicker(txtGitCompare, GetPickerRepos, "HEAD");
+        Disposed += (_, _) =>
+        {
+            _log.Dispose(); _cleanTip.Dispose();
+            _basePicker.Dispose(); _comparePicker.Dispose();
+        };
         cboConfig.Items.AddRange(new object[] { "Release", "Debug" });
         cboConfig.SelectedIndex = 0;
         cboEngine.Items.AddRange(new object[]
@@ -332,6 +342,26 @@ public partial class BuildReleaseForm : UserControl
         _gitCompareBranch = txtGitCompare.Text.Trim();
     }
 
+    private void btnGitBasePick_Click(object? sender, EventArgs e) => _basePicker.Toggle();
+
+    private void btnGitComparePick_Click(object? sender, EventArgs e) => _comparePicker.Toggle();
+
+    /// <summary>Distinct git repos of the checked configs (all configs when none is checked).</summary>
+    private IReadOnlyList<string> GetPickerRepos()
+    {
+        var source = new List<BuildConfig>();
+        for (int i = 0; i < clbConfigs.Items.Count && i < _configs.Count; i++)
+            if (clbConfigs.GetItemChecked(i)) source.Add(_configs[i]);
+        if (source.Count == 0) source = _configs;
+
+        return source
+            .Select(c => GitDiffHelper.DetectRepoFromPath(c.SolutionPath))
+            .Where(r => r != null)
+            .Select(r => r!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private void chkZipOutput_CheckedChanged(object? sender, EventArgs e)
     {
         if (_suppressGlobalEvents) return;
@@ -540,6 +570,8 @@ public partial class BuildReleaseForm : UserControl
         btnExtensions.Enabled = !_isBusy;
         txtGitBase.Enabled = !_isBusy;
         txtGitCompare.Enabled = !_isBusy;
+        btnGitBasePick.Enabled = !_isBusy;
+        btnGitComparePick.Enabled = !_isBusy;
         chkFilterGit.Enabled = !_isBusy;
         chkIncludeUncommitted.Enabled = !_isBusy;
     }

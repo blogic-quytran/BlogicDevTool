@@ -41,8 +41,10 @@ partial class BuildReleaseForm
 
     private Label lblGitBase;
     private TextBox txtGitBase;
+    private Button btnGitBasePick;
     private Label lblGitCompare;
     private TextBox txtGitCompare;
+    private Button btnGitComparePick;
     private CheckBox chkIncludeUncommitted;
 
     private Panel pnlActions;
@@ -69,6 +71,8 @@ partial class BuildReleaseForm
         cboConfig = new ComboBox();
         txtGitCompare = new TextBox();
         txtGitBase = new TextBox();
+        btnGitBasePick = new Button();
+        btnGitComparePick = new Button();
         lblGlobalOutBase = new Label();
         txtGlobalOutBase = new TextBox();
         btnGlobalBrowseOutBase = new Button();
@@ -124,6 +128,8 @@ partial class BuildReleaseForm
         pnlGlobal.Controls.Add(cboConfig);
         pnlGlobal.Controls.Add(txtGitCompare);
         pnlGlobal.Controls.Add(txtGitBase);
+        pnlGlobal.Controls.Add(btnGitBasePick);
+        pnlGlobal.Controls.Add(btnGitComparePick);
         pnlGlobal.Controls.Add(lblGlobalOutBase);
         pnlGlobal.Controls.Add(txtGlobalOutBase);
         pnlGlobal.Controls.Add(btnGlobalBrowseOutBase);
@@ -153,7 +159,7 @@ partial class BuildReleaseForm
         // 
         txtGitCompare.Location = new Point(688, 66);
         txtGitCompare.Name = "txtGitCompare";
-        txtGitCompare.Size = new Size(169, 23);
+        txtGitCompare.Size = new Size(143, 23);
         txtGitCompare.TabIndex = 8;
         txtGitCompare.TextChanged += txtGitCompare_TextChanged;
         // 
@@ -161,9 +167,29 @@ partial class BuildReleaseForm
         // 
         txtGitBase.Location = new Point(141, 33);
         txtGitBase.Name = "txtGitBase";
-        txtGitBase.Size = new Size(440, 23);
+        txtGitBase.Size = new Size(414, 23);
         txtGitBase.TabIndex = 6;
         txtGitBase.TextChanged += txtGitBase_TextChanged;
+        //
+        // btnGitBasePick
+        //
+        btnGitBasePick.Location = new Point(556, 32);
+        btnGitBasePick.Name = "btnGitBasePick";
+        btnGitBasePick.Size = new Size(26, 25);
+        btnGitBasePick.TabIndex = 6;
+        btnGitBasePick.Text = "▼";
+        btnGitBasePick.UseVisualStyleBackColor = true;
+        btnGitBasePick.Click += btnGitBasePick_Click;
+        //
+        // btnGitComparePick
+        //
+        btnGitComparePick.Location = new Point(832, 65);
+        btnGitComparePick.Name = "btnGitComparePick";
+        btnGitComparePick.Size = new Size(26, 25);
+        btnGitComparePick.TabIndex = 8;
+        btnGitComparePick.Text = "▼";
+        btnGitComparePick.UseVisualStyleBackColor = true;
+        btnGitComparePick.Click += btnGitComparePick_Click;
         // 
         // lblGlobalOutBase
         // 

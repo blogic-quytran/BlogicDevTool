@@ -72,6 +72,43 @@ public static class GitDiffHelper
         }
     }
 
+    /// <summary>Local + remote-tracking branches of a repo, newest commit first (Name, unix time).</summary>
+    public static async Task<List<(string Name, long Time)>> ListBranchesAsync(string repoPath)
+    {
+        var result = await RunGitAsync(repoPath,
+            "for-each-ref --sort=-committerdate --format=%(refname)|%(committerdate:unix) refs/remotes refs/heads",
+            30_000);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"git for-each-ref failed: {result.Output.Trim()}");
+
+        var list = new List<(string, long)>();
+        foreach (var line in SplitFileLines(result.Output))
+        {
+            var parts = line.Split('|');
+            if (parts.Length != 2) continue;           // stderr noise
+            var full = parts[0].Trim();
+            if (full.EndsWith("/HEAD")) continue;      // origin/HEAD symref
+            string name;
+            if (full.StartsWith("refs/heads/")) name = full.Substring("refs/heads/".Length);
+            else if (full.StartsWith("refs/remotes/")) name = full.Substring("refs/remotes/".Length);
+            else continue;
+            long.TryParse(parts[1].Trim(), out var t);
+            list.Add((name, t));
+        }
+        return list;
+    }
+
+    /// <summary>`git fetch --all --prune` — refreshes remote-tracking branches only.</summary>
+    public static async Task<(bool Ok, string Message)> FetchAllAsync(string repoPath)
+    {
+        try
+        {
+            var r = await RunGitAsync(repoPath, "fetch --all --prune", 120_000);
+            return (r.ExitCode == 0, r.Output.Trim());
+        }
+        catch (Exception ex) { return (false, ex.Message); }
+    }
+
     public static async Task<List<string>> GetChangedFilesAsync(
         string repoPath, string baseRef, string compareRef, bool includeUncommitted = false)
     {
