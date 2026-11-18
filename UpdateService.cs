@@ -109,7 +109,9 @@ public static class UpdateService
     /// <summary>The feed carries release notes as rendered HTML; turn it back into plain lines.</summary>
     private static string HtmlToText(string html)
     {
-        var s = Regex.Replace(html, @"<li[^>]*>", "- ", RegexOptions.IgnoreCase);
+        // Newlines between tags are layout only; keeping them doubles the gap between list items.
+        var s = Regex.Replace(html, @">\s+<", "><");
+        s = Regex.Replace(s, @"<li[^>]*>", "- ", RegexOptions.IgnoreCase);
         s = Regex.Replace(s, @"<br\s*/?>|</(p|li|h\d|div|pre)>", "\n", RegexOptions.IgnoreCase);
         s = WebUtility.HtmlDecode(Regex.Replace(s, "<[^>]+>", ""));
         return Regex.Replace(s, @"\n{3,}", "\n\n").Trim();
