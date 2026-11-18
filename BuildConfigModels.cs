@@ -7,8 +7,26 @@ public class BuildConfig
     public string Name { get; set; } = "";
     public string SolutionPath { get; set; } = "";
     public string BuildEngine { get; set; } = "dotnet"; // "dotnet" or "msbuild"
+    /// <summary>One or more destination folders (relative to OutputBasePath), separated
+    /// by ';' or ',' — e.g. "POS; POS/CCP/pax". Every destination receives the same
+    /// artifacts + extra folders. Empty means OutputBasePath itself.</summary>
     public string OutputFolderName { get; set; } = "";
     public List<string> ExtraFolders { get; set; } = new();
+
+    /// <summary>Destination folders parsed from <see cref="OutputFolderName"/>,
+    /// normalized to OS separators; a single "" entry when none is set.</summary>
+    public List<string> GetOutputFolders()
+    {
+        var list = (OutputFolderName ?? "")
+            .Split(new[] { ';', ',', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim().Replace('/', Path.DirectorySeparatorChar)
+                          .Trim(Path.DirectorySeparatorChar))
+            .Where(s => s.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (list.Count == 0) list.Add("");
+        return list;
+    }
     public List<string> RedistributeTo { get; set; } = new();
     /// <summary>Legacy per-config flag — read only to migrate into
     /// <see cref="BuildSettings.FilterByGit"/>; never written back.</summary>
@@ -49,14 +67,19 @@ public class BuildSettings
 
     public List<BuildConfig> Configs { get; set; } = new();
 
-    public string GetFinalOutputPath(BuildConfig c)
+    /// <summary>Absolute destination folder(s) for a config; empty when OutputBasePath is unset.</summary>
+    public List<string> GetFinalOutputPaths(BuildConfig c)
     {
-        if (string.IsNullOrWhiteSpace(OutputBasePath)) return "";
-        var folder = (c.OutputFolderName ?? "").Replace('/', Path.DirectorySeparatorChar).Trim();
-        return string.IsNullOrEmpty(folder)
-            ? OutputBasePath
-            : Path.Combine(OutputBasePath, folder);
+        if (string.IsNullOrWhiteSpace(OutputBasePath)) return new();
+        return c.GetOutputFolders()
+            .Select(f => f.Length == 0 ? OutputBasePath : Path.Combine(OutputBasePath, f))
+            .ToList();
     }
+
+    // MerchantUI DLLs are loaded by both POS and Merchant Manager, including their CCP plug-in folders.
+    public const string MerchantUiOutputFolders =
+        "POS; POS/CCP/pax; POS/CCP/BLS; "
+        + "BLogic Merchant/BLogic Merchant Manager; BLogic Merchant/BLogic Merchant Manager/CCP/pax";
 
     public static BuildSettings CreateDefault() => new()
     {
@@ -73,8 +96,7 @@ public class BuildSettings
                 Name = "Common",
                 SolutionPath = @"D:\BLOGIC\Planet\Common\Source\BLogicSystems.xPos.Common.sln",
                 BuildEngine = "msbuild",
-                OutputFolderName = "Common",
-                RedistributeTo = new() { "Server", "POS", "BO" },
+                OutputFolderName = "Server/bin; POS; BO",
             },
             new BuildConfig
             {
@@ -99,6 +121,34 @@ public class BuildSettings
                 BuildEngine = "msbuild",
                 OutputFolderName = "BO",
                 ExtraFolders = new() { "Language", "Templates" },
+            },
+            new BuildConfig
+            {
+                Name = "MerchantCommon",
+                SolutionPath = @"D:\BLOGIC\MerchantUI\MerchantCommon\Source\MerchantCommon.sln",
+                BuildEngine = "msbuild",
+                OutputFolderName = MerchantUiOutputFolders,
+            },
+            new BuildConfig
+            {
+                Name = "MerchantGUI",
+                SolutionPath = @"D:\BLOGIC\MerchantUI\MerchantGUI\Source\MerchantGUI.sln",
+                BuildEngine = "msbuild",
+                OutputFolderName = MerchantUiOutputFolders,
+            },
+            new BuildConfig
+            {
+                Name = "MerchantService",
+                SolutionPath = @"D:\BLOGIC\MerchantUI\MerchantService\Source\MerchantService.sln",
+                BuildEngine = "msbuild",
+                OutputFolderName = "BLogic Merchant/BLogic Merchant Service",
+            },
+            new BuildConfig
+            {
+                Name = "PaymentService",
+                SolutionPath = @"D:\BLOGIC\Merchant\PaymentService.sln",
+                BuildEngine = "msbuild",
+                OutputFolderName = "BLogic Merchant/BLogic Payment Service/bin",
             },
             new BuildConfig
             {

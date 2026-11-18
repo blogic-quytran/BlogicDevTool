@@ -20,13 +20,9 @@
         "Name": "Common",
         "SolutionPath": "D:\\BLOGIC\\Planet\\Common\\Source\\BLogicSystems.xPos.Common.sln",
         "BuildEngine": "msbuild",
-        "OutputFolderName": "Common",
+        "OutputFolderName": "Server/bin; POS; BO",
         "ExtraFolders": [],
-        "RedistributeTo": [
-          "Server",
-          "POS",
-          "BO"
-        ]
+        "RedistributeTo": []
       },
       {
         "Name": "Server",
@@ -67,7 +63,7 @@
         "Name": "MerchantCommon",
         "SolutionPath": "D:\\BLOGIC\\MerchantUI\\MerchantCommon\\Source\\MerchantCommon.sln",
         "BuildEngine": "msbuild",
-        "OutputFolderName": "Merchant",
+        "OutputFolderName": "POS; POS/CCP/pax; POS/CCP/BLS; BLogic Merchant/BLogic Merchant Manager; BLogic Merchant/BLogic Merchant Manager/CCP/pax",
         "ExtraFolders": [],
         "RedistributeTo": []
       },
@@ -75,7 +71,7 @@
         "Name": "MerchantGUI",
         "SolutionPath": "D:\\BLOGIC\\MerchantUI\\MerchantGUI\\Source\\MerchantGUI.sln",
         "BuildEngine": "msbuild",
-        "OutputFolderName": "Merchant",
+        "OutputFolderName": "POS; POS/CCP/pax; POS/CCP/BLS; BLogic Merchant/BLogic Merchant Manager; BLogic Merchant/BLogic Merchant Manager/CCP/pax",
         "ExtraFolders": [],
         "RedistributeTo": []
       },
@@ -83,7 +79,7 @@
         "Name": "MerchantService",
         "SolutionPath": "D:\\BLOGIC\\MerchantUI\\MerchantService\\Source\\MerchantService.sln",
         "BuildEngine": "msbuild",
-        "OutputFolderName": "Merchant",
+        "OutputFolderName": "BLogic Merchant/BLogic Merchant Service",
         "ExtraFolders": [],
         "RedistributeTo": []
       },
@@ -99,7 +95,7 @@
         "Name": "PaymentService",
         "SolutionPath": "D:\\BLOGIC\\Merchant\\PaymentService.sln",
         "BuildEngine": "msbuild",
-        "OutputFolderName": "PaymentService",
+        "OutputFolderName": "BLogic Merchant/BLogic Payment Service/bin",
         "ExtraFolders": [],
         "RedistributeTo": []
       }
@@ -126,14 +122,7 @@
       "FolderName": "BLogicReportService",
       "DestinationPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Service\\BLogicReportService"
     },
-    {
-      "FolderName": "PaymentService",
-      "DestinationPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Merchant\\BLogic Payment Service\\bin\\"
-    },
-    {
-      "FolderName": "Merchant",
-      "DestinationPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Merchant\\BLogic Merchant Service\\"
-    }
+    { "FolderName": "BLogic Merchant", "DestinationPath": "C:\\Program Files (x86)\\BLogic Systems\\BLogic Merchant" }
   ],
   "WebDav": {
     "BaseUrl": "http://192.168.1.194:8000/dav",

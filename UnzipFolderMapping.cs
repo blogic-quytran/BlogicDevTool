@@ -18,8 +18,8 @@ public static class UnzipConfigStore
         new() { FolderName = "BLogicConnector", DestinationPath = @"C:\Program Files (x86)\BLogic Systems\BLogicConnector" },
         new() { FolderName = "Server",          DestinationPath = @"C:\inetpub\wwwroot\BLogicService" },
         new() { FolderName = "BLogicReportService",     DestinationPath = @"C:\Program Files (x86)\BLogic Systems\BLogic Service\BLogicReportService" },
-        new() { FolderName = "BLogic Payment Service",  DestinationPath = @"C:\Program Files (x86)\BLogic Systems\BLogic Merchant\BLogic Payment Service" },
-        new() { FolderName = "BLogic Merchant Service", DestinationPath = @"C:\Program Files (x86)\BLogic Systems\BLogic Merchant\BLogic Merchant Service" },
+        // Holds BLogic Payment Service / Merchant Manager / Merchant Service as the build lays them out.
+        new() { FolderName = "BLogic Merchant",         DestinationPath = @"C:\Program Files (x86)\BLogic Systems\BLogic Merchant" },
         new() { FolderName = "BLogic Start Kiosk",      DestinationPath = @"C:\Program Files (x86)\BLogic Systems\BLogic Start Kiosk" },
     };
 

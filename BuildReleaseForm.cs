@@ -41,6 +41,10 @@ public partial class BuildReleaseForm : UserControl
         _cleanTip.SetToolTip(chkFilterGit,
             "Applies to every config: build/copy only projects changed between Git Base and Git Compare.\n"
             + "Repo is auto-detected from each solution path.");
+        txtOutFolder.PlaceholderText = "e.g. POS; POS/CCP/pax  (';' = several folders)";
+        _cleanTip.SetToolTip(txtOutFolder,
+            "One or more folders under Output Base, separated by ';'.\n"
+            + "Every folder gets the same DLLs + extra folders.");
         _cleanTip.SetToolTip(btnGitBasePick, "Pick / search a branch (from the checked configs' repos)");
         _cleanTip.SetToolTip(btnGitComparePick, "Pick / search a branch (from the checked configs' repos)");
         _basePicker = new GitBranchPicker(txtGitBase, GetPickerRepos);
@@ -107,14 +111,8 @@ public partial class BuildReleaseForm : UserControl
             LoadDetailFromConfig();
     }
 
-    private string BuildFullOutputPath(BuildConfig c)
-    {
-        if (string.IsNullOrWhiteSpace(_outputBasePath)) return "";
-        var folder = (c.OutputFolderName ?? "").Replace('/', Path.DirectorySeparatorChar).Trim();
-        return string.IsNullOrEmpty(folder)
-            ? _outputBasePath
-            : Path.Combine(_outputBasePath, folder);
-    }
+    private List<string> BuildFullOutputPaths(BuildConfig c) =>
+        new BuildSettings { OutputBasePath = _outputBasePath }.GetFinalOutputPaths(c);
 
     /// <summary>
     /// Where ExtraFolders (Templates, Language, …) should land for a given DLL
@@ -549,8 +547,15 @@ public partial class BuildReleaseForm : UserControl
             lblOutPreview.Text = "";
             return;
         }
-        var path = BuildFullOutputPath(_configs[_selectedIndex]);
-        lblOutPreview.Text = string.IsNullOrEmpty(path) ? "" : "→ " + path;
+        var paths = BuildFullOutputPaths(_configs[_selectedIndex]);
+        lblOutPreview.Text = paths.Count switch
+        {
+            0 => "",
+            1 => "→ " + paths[0],
+            _ => $"→ {paths.Count} folders: "
+                 + string.Join(" | ", _configs[_selectedIndex].GetOutputFolders()),
+        };
+        _cleanTip.SetToolTip(lblOutPreview, string.Join(Environment.NewLine, paths));
     }
 
     private void UpdateDetailEnabled()
@@ -737,7 +742,8 @@ public partial class BuildReleaseForm : UserControl
                 AppendLog($"        → {Path.GetFileName(a.OutputDllPath)}{tfm}");
             }
         }
-        AppendLog($"  Destination: {BuildFullOutputPath(c)}");
+        foreach (var dest in BuildFullOutputPaths(c))
+            AppendLog($"  Destination: {dest}");
     }
 
     // ── Build ──
@@ -838,7 +844,8 @@ public partial class BuildReleaseForm : UserControl
             AppendLog($"✘ SLN not found: {c.SolutionPath}");
             return false;
         }
-        var destPath = BuildFullOutputPath(c);
+        var destPaths = BuildFullOutputPaths(c);
+        var destPath = destPaths.FirstOrDefault() ?? "";
         if (string.IsNullOrWhiteSpace(destPath))
         {
             AppendLog($"✘ Output path is empty (set Output Base + Folder).");
@@ -923,37 +930,41 @@ public partial class BuildReleaseForm : UserControl
             AppendLog($"  ⚠ Could not save build log: {logEx.Message}");
         }
 
-        AppendLog($"\n  Output → {destPath}");
-        try { Directory.CreateDirectory(destPath); }
-        catch (Exception ex)
-        {
-            AppendLog($"  ✘ Cannot create output folder: {ex.Message}");
-            return false;
-        }
-
         var allArts = new List<BuildArtifact>();
         foreach (var p in targetProjects)
             allArts.AddRange(BuildHelper.ResolveOutputDlls(p, _configuration));
 
         var exts = _copyExtensions.Count > 0 ? _copyExtensions
             : new List<string> { ".dll", ".exe", ".pdb", ".xml", ".exe.config" };
-        AppendLog($"  Copying artifacts (extensions: {string.Join(", ", exts)})...");
-        var copied = BuildHelper.CopyArtifacts(allArts, destPath, exts, msg => AppendLog($"    {msg}"));
-        AppendLog($"  ✔ Copied {copied} file(s).");
 
-        if (c.ExtraFolders != null && c.ExtraFolders.Count > 0)
+        foreach (var outPath in destPaths)
         {
-            var extraDest = ExtraFoldersDestination(destPath);
-            var filterNote = extraFolderFilter != null
-                ? $" (git filter: {extraFolderFilter.Count} filename(s))"
-                : "";
-            AppendLog($"\n  Copying extra folders{filterNote}: {string.Join(", ", c.ExtraFolders)}");
-            if (!string.Equals(extraDest, destPath, StringComparison.OrdinalIgnoreCase))
-                AppendLog($"    (beside bin → {extraDest})");
-            var extraCopied = BuildHelper.CopyExtraFolders(
-                allArts, c.ExtraFolders, extraDest, extraFolderFilter,
-                msg => AppendLog($"    {msg}"));
-            AppendLog($"  ✔ Extra folders: {extraCopied} file(s).");
+            AppendLog($"\n  Output → {outPath}");
+            try { Directory.CreateDirectory(outPath); }
+            catch (Exception ex)
+            {
+                AppendLog($"  ✘ Cannot create output folder: {ex.Message}");
+                return false;
+            }
+
+            AppendLog($"  Copying artifacts (extensions: {string.Join(", ", exts)})...");
+            var copied = BuildHelper.CopyArtifacts(allArts, outPath, exts, msg => AppendLog($"    {msg}"));
+            AppendLog($"  ✔ Copied {copied} file(s).");
+
+            if (c.ExtraFolders != null && c.ExtraFolders.Count > 0)
+            {
+                var extraDest = ExtraFoldersDestination(outPath);
+                var filterNote = extraFolderFilter != null
+                    ? $" (git filter: {extraFolderFilter.Count} filename(s))"
+                    : "";
+                AppendLog($"\n  Copying extra folders{filterNote}: {string.Join(", ", c.ExtraFolders)}");
+                if (!string.Equals(extraDest, outPath, StringComparison.OrdinalIgnoreCase))
+                    AppendLog($"    (beside bin → {extraDest})");
+                var extraCopied = BuildHelper.CopyExtraFolders(
+                    allArts, c.ExtraFolders, extraDest, extraFolderFilter,
+                    msg => AppendLog($"    {msg}"));
+                AppendLog($"  ✔ Extra folders: {extraCopied} file(s).");
+            }
         }
 
         if (c.RedistributeTo != null && c.RedistributeTo.Count > 0)
@@ -968,30 +979,33 @@ public partial class BuildReleaseForm : UserControl
                     AppendLog($"    ⚠ Target config '{targetName}' not found.");
                     continue;
                 }
-                var targetPath = BuildFullOutputPath(target);
-                if (string.IsNullOrWhiteSpace(targetPath))
+                var targetPaths = BuildFullOutputPaths(target);
+                if (targetPaths.Count == 0)
                 {
                     AppendLog($"    ⚠ Target '{targetName}' has no output path.");
                     continue;
                 }
-                try { Directory.CreateDirectory(targetPath); }
-                catch (Exception ex)
+                foreach (var targetPath in targetPaths)
                 {
-                    AppendLog($"    ✘ Cannot create '{targetPath}': {ex.Message}");
-                    continue;
-                }
-                AppendLog($"    → {target.Name}: {targetPath}");
-                var rCopied = BuildHelper.CopyArtifacts(
-                    allArts, targetPath, exts, msg => AppendLog($"      {msg}"));
-                AppendLog($"    ✔ Copied {rCopied} file(s) to '{target.Name}'.");
+                    try { Directory.CreateDirectory(targetPath); }
+                    catch (Exception ex)
+                    {
+                        AppendLog($"    ✘ Cannot create '{targetPath}': {ex.Message}");
+                        continue;
+                    }
+                    AppendLog($"    → {target.Name}: {targetPath}");
+                    var rCopied = BuildHelper.CopyArtifacts(
+                        allArts, targetPath, exts, msg => AppendLog($"      {msg}"));
+                    AppendLog($"    ✔ Copied {rCopied} file(s) to '{target.Name}'.");
 
-                if (c.ExtraFolders != null && c.ExtraFolders.Count > 0)
-                {
-                    var rExtraDest = ExtraFoldersDestination(targetPath);
-                    var rExtra = BuildHelper.CopyExtraFolders(
-                        allArts, c.ExtraFolders, rExtraDest, extraFolderFilter,
-                        msg => AppendLog($"      {msg}"));
-                    AppendLog($"    ✔ Extra folders to '{target.Name}': {rExtra} file(s).");
+                    if (c.ExtraFolders != null && c.ExtraFolders.Count > 0)
+                    {
+                        var rExtraDest = ExtraFoldersDestination(targetPath);
+                        var rExtra = BuildHelper.CopyExtraFolders(
+                            allArts, c.ExtraFolders, rExtraDest, extraFolderFilter,
+                            msg => AppendLog($"      {msg}"));
+                        AppendLog($"    ✔ Extra folders to '{target.Name}': {rExtra} file(s).");
+                    }
                 }
             }
         }
@@ -1092,14 +1106,16 @@ public partial class BuildReleaseForm : UserControl
 
         foreach (var c in targets)
         {
-            AddDestination(BuildFullOutputPath(c), c.ExtraFolders);
+            foreach (var dest in BuildFullOutputPaths(c))
+                AddDestination(dest, c.ExtraFolders);
             foreach (var name in c.RedistributeTo ?? new List<string>())
             {
                 var t = _configs.FirstOrDefault(x =>
                     string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
                 if (t == null) continue;
                 // Redistribute copies THIS config's artifacts + extra folders into the target.
-                AddDestination(BuildFullOutputPath(t), c.ExtraFolders);
+                foreach (var dest in BuildFullOutputPaths(t))
+                    AddDestination(dest, c.ExtraFolders);
             }
         }
 
