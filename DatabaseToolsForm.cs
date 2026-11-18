@@ -596,15 +596,14 @@ public partial class DatabaseToolsForm : UserControl
             if (chkClearMailData.Checked)
             {
                 lblZipRestoreStatus.Text = "Clearing mail & SevenShift data...";
+                // Older store DBs lack the 7shifts columns/tables: guard each statement and
+                // run it via EXEC, since a missing column fails the whole batch at compile time.
                 const string cleanupSql =
-                    "DELETE dbo.EmailInfos\r\nGO\r\n" +
-                    "UPDATE dbo.Configurations SET ConfigurationValue = '' WHERE ConfigurationName = 'SystemConfigValue.SevenShiftCompanyID'\r\nGO\r\n" +
-                    "UPDATE dbo.Configurations SET ConfigurationValue = '' WHERE ConfigurationName = 'SystemConfigValue.SevenShiftLocation'\r\nGO\r\n" +
-                    "UPDATE dbo.Configurations SET ConfigurationValue = '' WHERE ConfigurationName = 'SystemConfigValue.SevenShiftAPIKey'\r\nGO\r\n" +
-                    "UPDATE dbo.Configurations SET ConfigurationValue = '' WHERE ConfigurationName = 'SystemConfigValue.CurrentSevenShiftLocation'\r\nGO\r\n" +
-                    "UPDATE dbo.Employees SET SevenShiftsUserID = 0\r\nGO\r\n" +
-                    "UPDATE dbo.Roles SET SevenShiftsRoleID = 0\r\nGO\r\n" +
-                    "UPDATE dbo.SevenShiftDepartment SET LocationID = 0\r\nGO";
+                    "IF OBJECT_ID('dbo.EmailInfos') IS NOT NULL EXEC(N'DELETE dbo.EmailInfos')\r\nGO\r\n" +
+                    "IF OBJECT_ID('dbo.Configurations') IS NOT NULL EXEC(N'UPDATE dbo.Configurations SET ConfigurationValue = '''' WHERE ConfigurationName IN (''SystemConfigValue.SevenShiftCompanyID'', ''SystemConfigValue.SevenShiftLocation'', ''SystemConfigValue.SevenShiftAPIKey'', ''SystemConfigValue.CurrentSevenShiftLocation'')')\r\nGO\r\n" +
+                    "IF COL_LENGTH('dbo.Employees', 'SevenShiftsUserID') IS NOT NULL EXEC(N'UPDATE dbo.Employees SET SevenShiftsUserID = 0')\r\nGO\r\n" +
+                    "IF COL_LENGTH('dbo.Roles', 'SevenShiftsRoleID') IS NOT NULL EXEC(N'UPDATE dbo.Roles SET SevenShiftsRoleID = 0')\r\nGO\r\n" +
+                    "IF COL_LENGTH('dbo.SevenShiftDepartment', 'LocationID') IS NOT NULL EXEC(N'UPDATE dbo.SevenShiftDepartment SET LocationID = 0')\r\nGO";
                 await _helper.ExecuteSqlBatchesAsync(cleanupSql, dbName);
             }
 
