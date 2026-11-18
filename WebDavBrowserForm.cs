@@ -116,10 +116,13 @@ public partial class WebDavBrowserForm : Form
         try
         {
             _entries = await _client.ListAsync(url);
-            _currentUrl = url.EndsWith("/") ? url : url + "/";
-            txtPath.Text = Uri.UnescapeDataString(new Uri(_currentUrl).AbsolutePath);
+            var newUrl = url.EndsWith("/") ? url : url + "/";
+            if (!string.Equals(newUrl, _currentUrl, StringComparison.OrdinalIgnoreCase))
+                _filter = "";   // the filter belongs to one folder; Refresh keeps it
+            _currentUrl = newUrl;
+            txtPath.Text = FolderPathText() + _filter;
             RenderList();
-            SetStatus($"✔ {_entries.Count} item(s).");
+            SetStatus(_filter.Length == 0 ? $"✔ {_entries.Count} item(s)." : FilterStatus());
             CaptureSettings();
             return true;
         }
@@ -156,7 +159,8 @@ public partial class WebDavBrowserForm : Form
             lstItems.Focus();
     }
 
-    /// <summary>Opens the folder of <paramref name="text"/>; a file link opens its folder and selects the file.</summary>
+    /// <summary>Opens the folder or file named by <paramref name="text"/>; when its last segment
+    /// matches nothing exactly, lists the parent folder filtered by that segment instead.</summary>
     private async Task<bool> GoToLinkAsync(string text)
     {
         if (_client == null) return false;
@@ -166,30 +170,84 @@ public partial class WebDavBrowserForm : Form
             SetStatus($"✘ Not a path on this server: {text}");
             return false;
         }
-
-        // A last segment with an extension (".zip") is treated as a file: open its folder and select it.
-        var lastSegment = Uri.UnescapeDataString(new Uri(url).Segments[^1]);
-        var isFile = !url.EndsWith("/") && Path.HasExtension(lastSegment);
-        if (!isFile)
+        if (url.EndsWith("/") || url.Length <= _client.BaseUri.AbsoluteUri.Length)
             return await NavigateAsync(url);
 
+        var lastSegment = Uri.UnescapeDataString(new Uri(url).Segments[^1]);
         var parent = url[..(url.LastIndexOf('/') + 1)];
-        if (!await NavigateAsync(parent)) return false;
+        if (!string.Equals(parent, _currentUrl, StringComparison.OrdinalIgnoreCase)
+            && !await NavigateAsync(parent))
+            return false;
 
-        if (!lastSegment.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && chkZipOnly.Checked)
-            chkZipOnly.Checked = false;   // otherwise the file would be hidden
-        foreach (ListViewItem item in lstItems.Items)
+        var exact = _entries.FirstOrDefault(en => en.Name.Equals(lastSegment, StringComparison.OrdinalIgnoreCase));
+        if (exact is { IsFolder: true })
+            return await NavigateAsync(exact.Url);
+        if (exact != null)
         {
-            if (item.Tag is WebDavEntry entry && entry.Name.Equals(lastSegment, StringComparison.OrdinalIgnoreCase))
+            SetFilter("");
+            if (!exact.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && chkZipOnly.Checked)
+                chkZipOnly.Checked = false;   // otherwise the file would be hidden
+            foreach (ListViewItem item in lstItems.Items)
             {
-                if (entry.IsFolder) return await NavigateAsync(entry.Url);   // a folder with a dot in its name
+                if (item.Tag != exact) continue;
                 item.Selected = item.Focused = true;
                 item.EnsureVisible();
-                return true;
             }
+            return true;
         }
-        SetStatus($"⚠ File not found in this folder: {lastSegment}");
+
+        SetFilter(lastSegment);
         return true;
+    }
+
+    // ── Name filter (last path segment typed in the path box + Enter) ──────────
+
+    private string _filter = "";
+
+    private string FolderPathText() =>
+        _currentUrl.Length == 0 ? "" : Uri.UnescapeDataString(new Uri(_currentUrl).AbsolutePath);
+
+    /// <summary>Space- or '*'-separated tokens, all of which must appear in the name (any case).</summary>
+    private string[] FilterTokens() =>
+        _filter.Split(new[] { ' ', '*' }, StringSplitOptions.RemoveEmptyEntries);
+
+    private bool MatchesFilter(WebDavEntry entry)
+    {
+        var tokens = FilterTokens();
+        return tokens.All(t => entry.Name.Contains(t, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void SetFilter(string filter)
+    {
+        _filter = filter.Trim();
+        txtPath.Text = FolderPathText() + _filter;
+        txtPath.SelectionStart = txtPath.Text.Length;
+        RenderList();
+        SetStatus(_filter.Length == 0 ? $"✔ {_entries.Count} item(s)." : FilterStatus());
+        if (lstItems.Items.Count > 0)
+        {
+            lstItems.Items[0].Selected = lstItems.Items[0].Focused = true;
+            lstItems.Items[0].EnsureVisible();
+        }
+    }
+
+    private string FilterStatus()
+    {
+        var n = lstItems.Items.Count;
+        return n == 0
+            ? $"⚠ Nothing matches \"{_filter}\" — Esc clears the filter."
+            : $"🔍 {n} item(s) match \"{_filter}\" — Esc clears the filter.";
+    }
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        // First Esc clears an active filter; only the next one closes the dialog.
+        if (keyData == Keys.Escape && _filter.Length > 0)
+        {
+            SetFilter("");
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
     }
 
     // ── Column sorting ────────────────────────────────────────────────────────
@@ -236,6 +294,8 @@ public partial class WebDavBrowserForm : Form
         {
             if (!entry.IsFolder && chkZipOnly.Checked &&
                 !entry.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (_filter.Length > 0 && !MatchesFilter(entry))
                 continue;
 
             var item = new ListViewItem((entry.IsFolder ? "📁  " : "🗄  ") + entry.Name)
