@@ -17,6 +17,8 @@ partial class BuildReleaseForm
     private Button btnDelete;
     private Button btnMoveUp;
     private Button btnMoveDown;
+    private Button btnCheckAll;
+    private Button btnUncheckAll;
     private CheckedListBox clbConfigs;
 
     private Panel pnlDetail;
@@ -88,6 +90,8 @@ partial class BuildReleaseForm
         btnDelete = new Button();
         btnMoveUp = new Button();
         btnMoveDown = new Button();
+        btnCheckAll = new Button();
+        btnUncheckAll = new Button();
         clbConfigs = new CheckedListBox();
         pnlDetail = new Panel();
         lblName = new Label();
@@ -299,6 +303,8 @@ partial class BuildReleaseForm
         pnlList.Controls.Add(btnDelete);
         pnlList.Controls.Add(btnMoveUp);
         pnlList.Controls.Add(btnMoveDown);
+        pnlList.Controls.Add(btnCheckAll);
+        pnlList.Controls.Add(btnUncheckAll);
         pnlList.Controls.Add(clbConfigs);
         pnlList.Location = new Point(8, 115);
         pnlList.Name = "pnlList";
@@ -346,6 +352,26 @@ partial class BuildReleaseForm
         btnMoveDown.Text = "↓";
         btnMoveDown.UseVisualStyleBackColor = true;
         btnMoveDown.Click += btnMoveDown_Click;
+        // 
+        // btnCheckAll
+        // 
+        btnCheckAll.Location = new Point(272, 8);
+        btnCheckAll.Name = "btnCheckAll";
+        btnCheckAll.Size = new Size(46, 28);
+        btnCheckAll.TabIndex = 5;
+        btnCheckAll.Text = "All";
+        btnCheckAll.UseVisualStyleBackColor = true;
+        btnCheckAll.Click += btnCheckAll_Click;
+        // 
+        // btnUncheckAll
+        // 
+        btnUncheckAll.Location = new Point(322, 8);
+        btnUncheckAll.Name = "btnUncheckAll";
+        btnUncheckAll.Size = new Size(46, 28);
+        btnUncheckAll.TabIndex = 6;
+        btnUncheckAll.Text = "None";
+        btnUncheckAll.UseVisualStyleBackColor = true;
+        btnUncheckAll.Click += btnUncheckAll_Click;
         // 
         // clbConfigs
         // 

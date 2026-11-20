@@ -45,6 +45,8 @@ public partial class BuildReleaseForm : UserControl
         _cleanTip.SetToolTip(txtOutFolder,
             "One or more folders under Output Base, separated by ';'.\n"
             + "Every folder gets the same DLLs + extra folders.");
+        _cleanTip.SetToolTip(btnCheckAll, "Check all configs");
+        _cleanTip.SetToolTip(btnUncheckAll, "Uncheck all configs");
         _cleanTip.SetToolTip(btnGitBasePick, "Pick / search a branch (from the checked configs' repos)");
         _cleanTip.SetToolTip(btnGitComparePick, "Pick / search a branch (from the checked configs' repos)");
         _basePicker = new GitBranchPicker(txtGitBase, GetPickerRepos);
@@ -470,6 +472,17 @@ public partial class BuildReleaseForm : UserControl
 
         if (!checkRect.Contains(e.Location))
             _suppressItemCheck = true;
+    }
+
+    private void btnCheckAll_Click(object? sender, EventArgs e) => SetAllChecked(true);
+
+    private void btnUncheckAll_Click(object? sender, EventArgs e) => SetAllChecked(false);
+
+    private void SetAllChecked(bool value)
+    {
+        _suppressItemCheck = false; // a stale label-click flag would swallow the first item
+        for (int i = 0; i < clbConfigs.Items.Count; i++)
+            clbConfigs.SetItemChecked(i, value);
     }
 
     private void clbConfigs_ItemCheck(object? sender, ItemCheckEventArgs e)
