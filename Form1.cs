@@ -2,7 +2,8 @@ namespace BLogicDevTool;
 
 public partial class Form1 : Form
 {
-    private SqlConnectionProfile? _sqlProfile;
+    // Read from SqlSessionStore so logins from any tab or the auto-login are shared.
+    private static SqlConnectionProfile? _sqlProfile => SqlSessionStore.Current;
 
     // ── Drag support (FormBorderStyle.None) ───────────────────────────
     private bool _dragging;
@@ -56,7 +57,25 @@ public partial class Form1 : Form
         base.OnLoad(e);
         WindowState = FormWindowState.Normal;
         menuItemUnzip_Click(this, EventArgs.Empty);
+        _ = TryAutoLoginSqlAsync();
         _ = CheckForUpdateAsync();
+    }
+
+    // Silently try the login dialog's defaults ("." + Windows Auth); on failure stay logged out.
+    private async Task TryAutoLoginSqlAsync()
+    {
+        try
+        {
+            var profile = new SqlConnectionProfile(".", windowsAuth: true);
+            await profile.CreateHelper().TestConnectionAsync();
+            // Keep a manual login made meanwhile; never swap the profile under a running operation.
+            if (IsDisposed || SqlSessionStore.Current != null || AppBusyState.IsBusy) return;
+            SqlSessionStore.SetProfile(profile);
+        }
+        catch
+        {
+            // No local instance / no permission: stay logged out.
+        }
     }
 
     // ── Update check (GitHub Releases) ───────────────────────────────
@@ -149,8 +168,7 @@ public partial class Form1 : Form
             using var login = new SqlLoginForm();
             if (login.ShowDialog(this) == DialogResult.OK && login.Profile != null)
             {
-                _sqlProfile = login.Profile;
-                SqlSessionStore.SetProfile(_sqlProfile);
+                SqlSessionStore.SetProfile(login.Profile);
             }
             else
             {
