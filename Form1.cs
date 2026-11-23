@@ -12,7 +12,8 @@ public partial class Form1 : Form
     public Form1()
     {
         InitializeComponent();
-        foreach (Control c in new Control[] { pnlNav, lblTitle })
+        var lblVersion = AddVersionLabel();
+        foreach (Control c in new Control[] { pnlNav, lblTitle, lblVersion })
         {
             c.MouseDown += Form_MouseDown;
             c.MouseMove += Form_MouseMove;
@@ -20,6 +21,34 @@ public partial class Form1 : Form
         }
         AppBusyState.Changed += OnAppBusyChanged;
         Disposed += (_, _) => AppBusyState.Changed -= OnAppBusyChanged;
+    }
+
+    // Small version tag after the title; the first nav button gives up its spare padding
+    // (right edge unchanged) so nothing else in the nav bar moves.
+    private Label AddVersionLabel()
+    {
+        var lbl = new Label
+        {
+            AutoSize  = true,
+            Text      = UpdateService.CurrentVersionText,
+            Font      = new Font("Segoe UI", 8F),
+            ForeColor = Color.FromArgb(160, 160, 160),
+            BackColor = Color.Transparent,
+        };
+        pnlNav.Controls.Add(lbl);
+        lbl.BringToFront();
+        // The title's real width is only known once its handle exists (emoji font fallback);
+        // re-place on resize/DPI scaling, keeping the designer's 5px gap before the IIS button.
+        void Place()
+        {
+            lbl.Location = new Point(lblTitle.Right + 2, lblTitle.Top + 2);
+            btnNavDatabase.Left  = lbl.Right + 6;
+            btnNavDatabase.Width = btnNavIis.Left - 5 - btnNavDatabase.Left;
+        }
+        lblTitle.SizeChanged += (_, _) => Place();
+        btnNavIis.LocationChanged += (_, _) => Place();
+        Place();
+        return lbl;
     }
 
     /// <summary>
