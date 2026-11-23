@@ -21,12 +21,16 @@ public sealed class AppConfig
     public List<IisDefaultPathEntry>? IisDefaultPaths { get; set; }
 }
 
-/// <summary>Single JSON config beside the exe; first run imports the old per-feature files
-/// (left on disk, no longer read).</summary>
+/// <summary>Single JSON config beside the exe (or in %LOCALAPPDATA% when that folder is not
+/// writable); first run imports the old per-feature files (left on disk, no longer read).</summary>
 public static class AppConfigStore
 {
-    public static readonly string StorePath = Path.Combine(
-        AppContext.BaseDirectory, "blogic_devtool_config.json");
+    private const string FileName = "blogic_devtool_config.json";
+    private static readonly string ExeDirPath = Path.Combine(AppContext.BaseDirectory, FileName);
+    private static readonly string UserPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BLogicDevTool", FileName);
+
+    public static readonly string StorePath = ResolveStorePath();
 
     private static readonly string LegacyAppDataDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -90,10 +94,49 @@ public static class AppConfigStore
             }
         }
 
-        _cache = MigrateLegacy();
+        // Store location changed (e.g. exe moved to a read-only folder) → carry the other copy over.
+        var other = StorePath == UserPath ? ExeDirPath : UserPath;
+        AppConfig? carried = null;
+        try { if (File.Exists(other)) carried = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(other)); }
+        catch { /* unreadable → fall through to legacy/defaults */ }
+
+        _cache = carried ?? MigrateLegacy();
         FillFromDefaults(_cache);
         TrySaveLocked(_cache);
         return _cache;
+    }
+
+    // Beside the exe when that folder is permanent and writable; otherwise per Windows user,
+    // so settings (DPAPI-protected passwords included) survive a restart.
+    private static string ResolveStorePath()
+    {
+        var dir = AppContext.BaseDirectory;
+        return IsTempDir(dir) || !CanWrite(dir) ? UserPath : ExeDirPath;
+    }
+
+    // Running an exe straight from a zip extracts it to a throw-away folder under Temp.
+    private static bool IsTempDir(string dir)
+    {
+        var full = Path.GetFullPath(dir);
+        var temps = new[]
+        {
+            Path.GetTempPath(),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp"),
+        };
+        return temps.Any(t => full.StartsWith(Path.GetFullPath(t), StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool CanWrite(string dir)
+    {
+        try
+        {
+            if (File.Exists(ExeDirPath) && File.GetAttributes(ExeDirPath).HasFlag(FileAttributes.ReadOnly))
+                return false;
+            var probe = Path.Combine(dir, $".write_probe_{Guid.NewGuid():N}");
+            using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { }
+            return true;
+        }
+        catch { return false; }
     }
 
     /// <summary>The shipped default_config.json; empty sections when the resource is missing.</summary>
