@@ -649,8 +649,15 @@ public partial class UnzipWorkbenchForm : UserControl
 
         try
         {
-            await DeployAsync(zipPath, mappings);
-            ShowResult(_runErrors.Count == 0, "Deployment finished.");
+            var folderStats = await DeployAsync(zipPath, mappings);
+            // Final summary: only folders actually deployed (skipped/not-in-ZIP ones are omitted).
+            var details = folderStats
+                .Where(f => f.Copied > 0 || f.Errors > 0)
+                .Select(f => (
+                    $"📁 {f.Folder} - copied ({f.Copied})" + (f.Errors > 0 ? $" - error ({f.Errors})" : ""),
+                    f.Errors > 0 ? Color.Orange : Color.LightGreen))
+                .ToList();
+            ShowResult(_runErrors.Count == 0, "Deployment finished", details);
         }
         catch (Exception ex)
         {
@@ -664,8 +671,10 @@ public partial class UnzipWorkbenchForm : UserControl
         }
     }
 
-    private async Task DeployAsync(string zipPath, List<UnzipFolderMapping> mappings)
+    private async Task<List<(string Folder, int Copied, int Errors)>> DeployAsync(
+        string zipPath, List<UnzipFolderMapping> mappings)
     {
+        var folderStats = new List<(string Folder, int Copied, int Errors)>();
         // One backup per task, named after the ZIP (e.g. "PSS255"), under <toolDir>\backups\.
         // Write-once & accumulating: re-deploying the same task only adds files not yet
         // captured — so this single folder is the rollback point for the task.
@@ -714,7 +723,7 @@ public partial class UnzipWorkbenchForm : UserControl
                 }
 
                 AppendLog($"\n  📁 {mapping.FolderName}  →  {destDir}");
-                int fileCount = 0;
+                int fileCount = 0, errorCount = 0;
 
                 foreach (var entry in entries)
                 {
@@ -762,11 +771,13 @@ public partial class UnzipWorkbenchForm : UserControl
                     }
                     catch (Exception ex)
                     {
+                        errorCount++;
                         _runErrors.Add($"{mapping.FolderName}/{relativePath}: {ex.Message}");
                         AppendLog($"     ✘ {relativePath}: {ex.Message}");
                     }
                 }
 
+                folderStats.Add((mapping.FolderName.TrimEnd('/'), fileCount, errorCount));
                 AppendLog($"  ✔ Copied {fileCount} file(s).");
             }
         });
@@ -799,8 +810,8 @@ public partial class UnzipWorkbenchForm : UserControl
             }
         }
 
-        AppendLog($"\n✔ Deployment completed at {DateTime.Now:HH:mm:ss}.");
         SetStatus($"✔ Deployment complete — {totalFiles} file(s) updated.");
+        return folderStats;
     }
 
     // ── Rollback Task ─────────────────────────────────────────────────────────
@@ -991,31 +1002,38 @@ public partial class UnzipWorkbenchForm : UserControl
 
     /// <summary>Result banner: green COMPLETE, or red FAILED listing what went wrong
     /// (which file / why) from <see cref="_runErrors"/>.</summary>
-    private void ShowResult(bool success, string? summary)
+    /// <param name="details">Optional extra lines shown under the banner (e.g. per-folder deploy counts).</param>
+    private void ShowResult(bool success, string? summary,
+        IReadOnlyList<(string Text, Color Color)>? details = null)
     {
-        if (InvokeRequired) { Invoke(() => ShowResult(success, summary)); return; }
+        if (InvokeRequired) { Invoke(() => ShowResult(success, summary, details)); return; }
+        bool ok = success && _runErrors.Count == 0;
+        var errColor = Color.FromArgb(255, 110, 110);
+
+        // One line: "✔ COMPLETE   <summary> - HH:mm:ss" (big banner word, normal-size tail).
+        var text = summary?.Trim().TrimEnd('.');
+        var tail = (string.IsNullOrEmpty(text) ? "" : text + " - ") + DateTime.Now.ToString("HH:mm:ss");
+
         AppendColored(Environment.NewLine, Color.Gainsboro, null);
-        if (success && _runErrors.Count == 0)
+        AppendColored(ok ? "  ✔  COMPLETE" : "  ✘  FAILED", ok ? Color.LimeGreen : Color.Red, _bannerFont);
+        AppendColored("   " + tail + Environment.NewLine, ok ? Color.LightGreen : errColor, null);
+
+        if (details != null)
+            foreach (var (line, color) in details)
+                AppendColored("   " + line + Environment.NewLine, color, null);
+
+        if (ok)
         {
-            AppendColored("  ✔  COMPLETE" + Environment.NewLine, Color.LimeGreen, _bannerFont);
-            if (!string.IsNullOrWhiteSpace(summary))
-                AppendColored("  " + summary + Environment.NewLine, Color.LightGreen, null);
-            SetStatus("✔ " + (summary ?? "Complete."));
+            SetStatus("✔ " + (string.IsNullOrEmpty(text) ? "Complete." : text + "."));
         }
         else
         {
-            AppendColored("  ✘  FAILED" + Environment.NewLine, Color.Red, _bannerFont);
             if (_runErrors.Count > 0)
             {
-                AppendColored($"  {_runErrors.Count} error(s):" + Environment.NewLine,
-                    Color.FromArgb(255, 110, 110), null);
+                AppendColored($"  {_runErrors.Count} error(s):" + Environment.NewLine, errColor, null);
                 foreach (var err in _runErrors)
-                    AppendColored("   • " + err + Environment.NewLine,
-                        Color.FromArgb(255, 110, 110), null);
+                    AppendColored("   • " + err + Environment.NewLine, errColor, null);
             }
-            else if (!string.IsNullOrWhiteSpace(summary))
-                AppendColored("  " + summary + Environment.NewLine,
-                    Color.FromArgb(255, 110, 110), null);
             SetStatus("✘ Failed — see log.");
         }
         _log.Flush();   // the banner must land after every queued line
