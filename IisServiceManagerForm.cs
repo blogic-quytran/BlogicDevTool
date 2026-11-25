@@ -6,10 +6,15 @@ public partial class IisServiceManagerForm : UserControl
     private List<IisAppEntry> _apps = new();
     private IisAppEntry? _selected;
 
+    // Column-header sort; kept across refreshes. null = IIS order.
+    private string? _sortColumn;
+    private bool _sortAsc = true;
+
     public IisServiceManagerForm(SqlConnectionProfile? profile)
     {
         _profile = profile ?? SqlSessionStore.Current;
         InitializeComponent();
+        dgvApps.ColumnHeaderMouseClick += dgvApps_ColumnHeaderMouseClick;
         SqlSessionStore.ProfileChanged += OnSessionProfileChanged;
         Disposed += (_, _) => SqlSessionStore.ProfileChanged -= OnSessionProfileChanged;
     }
@@ -567,6 +572,26 @@ public partial class IisServiceManagerForm : UserControl
     /// string of the app, so a second one cannot sit there unnoticed.</summary>
     private void BindGrid()
     {
+        // Rebinding fires SelectionChanged (selects row 0) — remember the real selection first.
+        var keep = _selected;
+
+        if (_sortColumn != null)
+        {
+            Func<IisAppEntry, string> key = _sortColumn switch
+            {
+                "Site"         => a => a.SiteName,
+                "App"          => a => a.AppPath,
+                "AppPoolName"  => a => a.AppPoolName,
+                "PhysicalPath" => a => a.PhysicalPath,
+                "Database"     => a => a.DatabaseSummary,
+                _              => a => a.SiteName
+            };
+            _apps = (_sortAsc
+                    ? _apps.OrderBy(a => key(a) ?? "", StringComparer.OrdinalIgnoreCase)
+                    : _apps.OrderByDescending(a => key(a) ?? "", StringComparer.OrdinalIgnoreCase))
+                .ToList();
+        }
+
         dgvApps.DataSource = null;
         dgvApps.DataSource = _apps.Select(a => new
         {
@@ -578,6 +603,38 @@ public partial class IisServiceManagerForm : UserControl
         }).ToList();
 
         refreshDgv();
+
+        // Sort arrows (Programmatic = header click is handled by us, glyph shown).
+        foreach (DataGridViewColumn col in dgvApps.Columns)
+        {
+            col.SortMode = DataGridViewColumnSortMode.Programmatic;
+            col.HeaderCell.SortGlyphDirection = col.Name == _sortColumn
+                ? (_sortAsc ? SortOrder.Ascending : SortOrder.Descending)
+                : SortOrder.None;
+        }
+
+        // Put the selection back on the same app (by site + path), not on whatever row 0 is now.
+        if (keep != null)
+        {
+            var idx = _apps.FindIndex(a => a.SiteName == keep.SiteName && a.AppPath == keep.AppPath);
+            if (idx >= 0 && idx < dgvApps.Rows.Count)
+            {
+                dgvApps.ClearSelection();
+                dgvApps.Rows[idx].Selected = true;
+                dgvApps.CurrentCell = dgvApps.Rows[idx].Cells[0];
+                _selected = _apps[idx];
+            }
+        }
+    }
+
+    /// <summary>Header click: sort by that column; clicking the same column again flips direction.</summary>
+    private void dgvApps_ColumnHeaderMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+    {
+        if (e.ColumnIndex < 0) return;
+        var name = dgvApps.Columns[e.ColumnIndex].Name;
+        _sortAsc = name == _sortColumn ? !_sortAsc : true;
+        _sortColumn = name;
+        BindGrid();
     }
 
     private void refreshDgv()
