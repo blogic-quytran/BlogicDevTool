@@ -870,6 +870,7 @@ public partial class BuildReleaseForm : UserControl
 
         List<string> targetProjects;
         HashSet<string>? extraFolderFilter = null;
+        List<string>? gitChangedFiles = null;
         if (_filterByGit)
         {
             var (owning, changedFiles) = await ResolveAffectedProjectsAsync(c, projects);
@@ -878,6 +879,7 @@ public partial class BuildReleaseForm : UserControl
             AppendLog($"  Affected projects: {targetProjects.Count}");
             if (changedFiles != null)
             {
+                gitChangedFiles = changedFiles;
                 extraFolderFilter = new HashSet<string>(
                     changedFiles.Select(Path.GetFileName).Where(s => !string.IsNullOrEmpty(s))!,
                     StringComparer.OrdinalIgnoreCase);
@@ -980,6 +982,23 @@ public partial class BuildReleaseForm : UserControl
             }
         }
 
+        // A template/language file changed in git but absent from bin\<folder> is silently
+        // left out of the package (typically a <Content> item without CopyToOutputDirectory).
+        if (gitChangedFiles != null && c.ExtraFolders != null && c.ExtraFolders.Count > 0)
+        {
+            var missing = BuildHelper.FindChangedExtrasMissingFromOutput(
+                gitChangedFiles, targetProjects, c.ExtraFolders, allArts);
+            if (missing.Count > 0)
+            {
+                AppendLog($"\n  ⚠ {missing.Count} changed file(s) NOT in the build output — not shipped:");
+                foreach (var m in missing)
+                {
+                    AppendLog($"  ⚠   {Path.GetFileName(m.SourceFile)} — expected {m.ExpectedOutput}");
+                    AppendLog($"  ⚠     → set <CopyToOutputDirectory> on it in {Path.GetFileName(m.ProjectPath)}");
+                }
+            }
+        }
+
         if (c.RedistributeTo != null && c.RedistributeTo.Count > 0)
         {
             AppendLog($"\n  Redistributing to: {string.Join(", ", c.RedistributeTo)}");
@@ -1069,18 +1088,20 @@ public partial class BuildReleaseForm : UserControl
         AppendLog($"  Git diff: {changed.Count} file(s) changed ({diffScope}).");
 
         var owning = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var changedFull = new List<string>();   // absolute paths, for the extra-folder check
         foreach (var f in changed)
         {
             try
             {
                 var rel = f.TrimStart('/', '\\');
                 var fullPath = Path.GetFullPath(Path.Combine(repoPath, rel));
+                changedFull.Add(fullPath);
                 var owner = BuildHelper.FindOwningCsproj(fullPath, projectsInSolution);
                 if (owner != null) owning.Add(owner);
             }
             catch { /* skip malformed entry */ }
         }
-        return (owning.ToList(), changed);
+        return (owning.ToList(), changedFull);
     }
 
     /// <summary>

@@ -201,6 +201,58 @@ public static class BuildHelper
         return totalCopied;
     }
 
+    /// <summary>Git-changed files in a project's source extra folder (Templates\X.repx) that are
+    /// absent from its bin\Templates — CopyExtraFolders would drop them silently
+    /// (typically a &lt;Content&gt; item without CopyToOutputDirectory).</summary>
+    public static List<(string SourceFile, string ExpectedOutput, string ProjectPath)>
+        FindChangedExtrasMissingFromOutput(IEnumerable<string> changedFullPaths,
+            IReadOnlyList<string> targetProjects, IReadOnlyList<string> folderNames,
+            List<BuildArtifact> artifacts)
+    {
+        var missing = new List<(string, string, string)>();
+        var folders = folderNames
+            .Select(n => n.Trim().Trim('/', '\\'))
+            .Where(n => n.Length > 0)
+            .ToList();
+        if (folders.Count == 0) return missing;
+
+        static string Full(string p) { try { return Path.GetFullPath(p); } catch { return p; } }
+
+        foreach (var file in changedFullPaths)
+        {
+            if (!File.Exists(file)) continue;
+            var owner = FindOwningCsproj(file, targetProjects);
+            if (owner == null) continue;
+            var ownerFull = Full(owner);
+            var projDir = Path.GetDirectoryName(ownerFull);
+            if (string.IsNullOrEmpty(projDir)) continue;
+
+            foreach (var folder in folders)
+            {
+                var rel = Path.GetRelativePath(Path.Combine(projDir, folder), file);
+                if (rel == ".." || rel.StartsWith(".." + Path.DirectorySeparatorChar)
+                    || Path.IsPathRooted(rel))
+                    continue;   // not inside this extra folder
+
+                var outDirs = artifacts
+                    .Where(a => string.Equals(Full(a.ProjectPath), ownerFull,
+                        StringComparison.OrdinalIgnoreCase))
+                    .Select(a => Path.GetDirectoryName(a.OutputDllPath))
+                    .Where(d => !string.IsNullOrEmpty(d))
+                    .Select(d => d!)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (outDirs.Count > 0
+                    && !outDirs.Any(d => File.Exists(Path.Combine(d, folder, rel))))
+                {
+                    missing.Add((file, Path.Combine(outDirs[0], folder, rel), owner));
+                }
+                break;
+            }
+        }
+        return missing;
+    }
+
     private static (int Copied, int Skipped) CopyDirectoryRecursive(
         string sourceDir, string destDir, HashSet<string>? filenameFilter)
     {
