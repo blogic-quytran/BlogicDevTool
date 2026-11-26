@@ -104,7 +104,7 @@ public class BuildSettings
                 SolutionPath = @"D:\BLOGIC\Planet\Server\Source\BLogicSystems.xPos.Server.sln",
                 BuildEngine = "msbuild",
                 OutputFolderName = "Server/bin",
-                ExtraFolders = new() { "Language", "Templates" },
+                ExtraFolders = new() { "Language", "Templates", "Templates_VN" },
             },
             new BuildConfig
             {
@@ -112,7 +112,7 @@ public class BuildSettings
                 SolutionPath = @"D:\BLOGIC\Planet\PointOfSale\Source\BLogicSystems.xPos.PointOfSale.sln",
                 BuildEngine = "msbuild",
                 OutputFolderName = "POS",
-                ExtraFolders = new() { "Language", "Templates" },
+                ExtraFolders = new() { "Language", "Templates", "Templates_VN" },
             },
             new BuildConfig
             {
@@ -120,7 +120,7 @@ public class BuildSettings
                 SolutionPath = @"D:\BLOGIC\Planet\BackOffice\Source\BLogicSystems.POS.BackOffice.sln",
                 BuildEngine = "msbuild",
                 OutputFolderName = "BO",
-                ExtraFolders = new() { "Language", "Templates" },
+                ExtraFolders = new() { "Language", "Templates", "Templates_VN" },
             },
             new BuildConfig
             {

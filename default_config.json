@@ -31,7 +31,8 @@
         "OutputFolderName": "Server/bin",
         "ExtraFolders": [
           "Language",
-          "Templates"
+          "Templates",
+          "Templates_VN"
         ],
         "RedistributeTo": []
       },
@@ -43,6 +44,7 @@
         "ExtraFolders": [
           "Language",
           "Templates",
+          "Templates_VN",
           "Sound",
           "CCP/BLS"
         ],
@@ -55,7 +57,8 @@
         "OutputFolderName": "BO",
         "ExtraFolders": [
           "Language",
-          "Templates"
+          "Templates",
+          "Templates_VN"
         ],
         "RedistributeTo": []
       },
